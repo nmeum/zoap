@@ -44,6 +44,7 @@ pub const Parser = struct {
     header: Header,
     slice: []const u8,
     token: ?[]const u8,
+    payload: ?*const u8,
     // For the first instance in a message, a preceding
     // option instance with Option Number zero is assumed.
     option_nr: u32 = 0,
@@ -80,9 +81,10 @@ pub const Parser = struct {
         }
 
         return Parser{
-            .header = hdr,
-            .token  = token,
-            .slice  = slice,
+            .header  = hdr,
+            .token   = token,
+            .slice   = slice,
+            .payload = null,
         };
     }
 
@@ -126,13 +128,16 @@ pub const Parser = struct {
         }
     }
 
-    fn next_option(self: *Parser) !Option {
+    fn next_option(self: *Parser) !?Option {
         if (self.slice.len < 1)
             return error.EndOfStream;
 
         const option = self.slice[0];
-        if (option == OPTION_END)
-            return error.EndOfOptions;
+        if (option == OPTION_END) {
+            if (self.slice.len > 1)
+                self.payload = &self.slice[1]; // byte after OPTION_END
+            return null;
+        }
 
         // Advance slice since decode_value access it.
         // XXX: reset slice position on decode_value error?
@@ -151,6 +156,14 @@ pub const Parser = struct {
             .value  = value,
         };
     }
+
+    fn skip_options(self: *Parser) !void {
+        while (true) {
+            var opt = try self.next_option();
+            if (opt == null)
+                break;
+        }
+    }
 };
 
 test "test header parser" {
@@ -166,10 +179,20 @@ test "test header parser" {
     testing.expect(hdr.message_id == 2342);
 }
 
+test "test payload parsing" {
+    const buf: []const u8 = &[_]u8{0x62, 0x03, 0x04, 0xd2, 0xdd, 0x64, 0xff, 0x17, 0x2a, 0x0d, 0x25};
+    var par = try Parser.init(buf);
+
+    try par.skip_options();
+    testing.expect(par.payload.? == &buf[7]);
+}
+
 test "test option parser" {
     const buf: []const u8 = &[_]u8{0x41, 0x01, 0x09, 0x26, 0x17, 0xd2, 0x0a, 0x0d, 0x25};
     var par = try Parser.init(buf);
-    const opt = try par.next_option();
+
+    const next_opt = try par.next_option();
+    const opt = next_opt.?;
     const val = opt.value;
 
     testing.expect(opt.number == 23);
