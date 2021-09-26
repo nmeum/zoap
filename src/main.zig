@@ -111,6 +111,11 @@ pub const Parser = struct {
                 return std.mem.bigToNative(u16, result) + 269;
             },
             15 => {
+                // From RFC 7252:
+                //
+                //  15: Reserved for future use. If the field is set to this value,
+                //  it MUST be processed as a message format error.
+                //
                 return error.PayloadMarker;
             },
             else => {
@@ -119,8 +124,7 @@ pub const Parser = struct {
         }
     }
 
-    // TODO: Comptime to enforce order of functions calls (e.g. no next_option after skip_options)
-
+    // TODO: comptime to enforce order of functions calls (e.g. no next_option after skip_options)
     fn next_option(self: *Parser) !?Option {
         if (self.last_option == null)
             return null;
@@ -147,6 +151,7 @@ pub const Parser = struct {
             .number = optnum,
             .value  = optval,
         };
+
         self.last_option = ret;
         return ret;
     }
