@@ -1,5 +1,6 @@
 const std = @import("std");
 const testing = std.testing;
+const codes = @import("code.zig");
 
 // CoAP version implemented by this library.
 //
@@ -30,7 +31,7 @@ const Header = packed struct {
     version: u2,
     type: Mtype,
     token_len: u4,
-    code: u8,
+    code: codes.Code,
     message_id: u16,
 };
 
@@ -43,6 +44,8 @@ pub const Parser = struct {
     header: Header,
     slice: []const u8,
     token: ?[]const u8,
+    // For the first instance in a message, a preceding
+    // option instance with Option Number zero is assumed.
     option_nr: u32 = 0,
 
     const MAX_TOKEN_LEN = 8;
@@ -78,6 +81,72 @@ pub const Parser = struct {
             .slice  = slice,
         };
     }
+
+    // https://datatracker.ietf.org/doc/html/rfc7252#section-3.1
+    fn decode_value(self: *Parser, val: u8) !u16 {
+        switch (val) {
+            13 => {
+                // From RFC 7252:
+                //
+                //  13: An 8-bit unsigned integer follows the initial byte and
+                //  indicates the Option Delta minus 13.
+                //
+                if (self.slice.len < 1)
+                    return error.EndOfStream;
+
+                const result: u8 = self.slice[0] + 13;
+                self.slice = self.slice[1..];
+
+                return @as(u16, result);
+            },
+            14 => {
+                // From RFC 7252:
+                //
+                //  14: A 16-bit unsigned integer in network byte order follows the
+                //  initial byte and indicates the Option Delta minus 269.
+                //
+                if (self.slice.len < 2)
+                    return error.FormatError;
+
+                const result: u16 = @bitCast(u16, self.slice[0..2].*);
+                self.slice = self.slice[3..];
+
+                return std.mem.bigToNative(u16, result) + 269;
+            },
+            15 => {
+                return error.PayloadMarker;
+            },
+            else => {
+                return val;
+            },
+        }
+    }
+
+    fn next_option(self: *Parser) !Option {
+        if (self.slice.len < 1)
+            return error.EndOfStream;
+
+        const option = self.slice[0];
+        if (option == OPTION_END)
+            return error.EndOfOptions;
+
+        // Advance slice since decode_value access it.
+        // XXX: reset slice position on decode_value error?
+        self.slice = self.slice[1..];
+
+        const delta = try self.decode_value(option >> 4);
+        const len = try self.decode_value(option & 0xf);
+
+        self.option_nr += delta;
+
+        const value = self.slice[0..len];
+        self.slice = self.slice[len..];
+
+        return Option{
+            .number = self.option_nr,
+            .value  = value,
+        };
+    }
 };
 
 test "test header parser" {
@@ -88,6 +157,18 @@ test "test header parser" {
     testing.expect(hdr.version == Version);
     testing.expect(hdr.type == Mtype.confirmable);
     testing.expect(hdr.token_len == 4);
-    // TODO: hdr.code
+    testing.expect(hdr.code.equal(codes.GET));
     testing.expect(hdr.message_id == 2342);
+}
+
+test "test option parser" {
+    const buf: []const u8 = &[_]u8{0x41, 0x01, 0x09, 0x26, 0x17, 0xd2, 0x0a, 0x0d, 0x25};
+    var par = try Parser.init(buf);
+    const opt = try par.next_option();
+    const val = opt.value;
+
+    testing.expect(opt.number == 23);
+    testing.expect(val.len == 2);
+    testing.expect(val[0] == 13);
+    testing.expect(val[1] == 37);
 }
