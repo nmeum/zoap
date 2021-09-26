@@ -114,7 +114,7 @@ pub const Parser = struct {
                 if (self.slice.len < 2)
                     return error.FormatError;
 
-                const result: u16 = @bitCast(u16, self.slice[0..2].*);
+                const result: u16 = @bitCast(u16, self.slice[0..@sizeOf(u16)].*);
                 self.slice = self.slice[3..];
 
                 return std.mem.bigToNative(u16, result) + 269;
