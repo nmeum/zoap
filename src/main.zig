@@ -64,7 +64,11 @@ pub const Parser = struct {
         hdr.message_id = std.mem.bigToNative(u16, hdr.message_id);
 
         // Skip header in given buffer
-        slice = buf[1..];
+        slice = buf[@sizeOf(Header)..];
+
+        // TODO: Somehow extraction of the token length does not work
+        // via packed structs in Zig 0.7.1 (probably compiler bug).
+        hdr.token_len = @intCast(u4, buf[0] & 0xf);
 
         var token: ?[]const u8 = null;
         if (hdr.token_len > 0) {
@@ -156,7 +160,8 @@ test "test header parser" {
 
     testing.expect(hdr.version == Version);
     testing.expect(hdr.type == Mtype.confirmable);
-    testing.expect(hdr.token_len == 4);
+    testing.expect(hdr.token_len == 1);
+    testing.expect(par.token.?[0] == 23);
     testing.expect(hdr.code.equal(codes.GET));
     testing.expect(hdr.message_id == 2342);
 }
