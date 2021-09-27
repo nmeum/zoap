@@ -40,9 +40,45 @@ pub const Option = struct {
     value: []const u8,
 };
 
+const Buffer = struct {
+    slice: []const u8,
+
+    pub fn get_u8(self: *Buffer) u8 {
+        const result = self.slice[0];
+        self.slice = self.slice[@sizeOf(u8)..];
+        return result;
+    }
+
+    pub fn get_u16(self: *Buffer) u16 {
+        const result = self.slice[0..@sizeOf(u16)].*;
+        self.slice = self.slice[@sizeOf(u16)..];
+        return @bitCast(u16, result);
+    }
+
+    pub fn get_u32(self: *Buffer) u32 {
+        const result = self.slice[0..@sizeOf(u32)].*;
+        self.slice = self.slice[@sizeOf(u32)..];
+        return @bitCast(u32, result);
+    }
+
+    pub fn get_ptr(self: *Buffer) *const u8 {
+        return &self.slice[0];
+    }
+
+    pub fn get_bytes(self: *Buffer, numBytes: usize) []const u8 {
+        const result = self.slice[0..numBytes];
+        self.slice = self.slice[numBytes..];
+        return result;
+    }
+
+    pub fn length(self: *Buffer) usize {
+        return self.slice.len;
+    }
+};
+
 pub const Parser = struct {
     header: Header,
-    slice: []const u8,
+    slice: Buffer,
     token: ?[]const u8,
     payload: ?*const u8,
     last_option: ?Option,
@@ -51,31 +87,28 @@ pub const Parser = struct {
     const OPTION_END = 0xff;
 
     pub fn init(buf: []const u8) !Parser {
-        var slice = buf;
+        var slice = Buffer{.slice = buf};
         if (buf.len < @sizeOf(Header))
             return error.FormatError;
 
         // Cast first four bytes to u32 and convert them to header struct
-        const serialized: u32 = @bitCast(u32, slice[0..@sizeOf(Header)].*);
+        const firstByte = slice.slice[0]; // XXX (see below)
+        const serialized: u32 = slice.get_u32();
         var hdr = @bitCast(Header, serialized);
 
         // Convert message_id to a integer in host byteorder
         hdr.message_id = std.mem.bigToNative(u16, hdr.message_id);
 
-        // Skip header in given buffer
-        slice = buf[@sizeOf(Header)..];
-
         // TODO: Somehow extraction of the token length does not work
         // via packed structs in Zig 0.7.1 (probably compiler bug).
-        hdr.token_len = @intCast(u4, buf[0] & 0xf);
+        hdr.token_len = @intCast(u4, firstByte & 0xf);
 
         var token: ?[]const u8 = null;
         if (hdr.token_len > 0) {
-            if (hdr.token_len > slice.len or hdr.token_len > MAX_TOKEN_LEN)
+            if (hdr.token_len > slice.length() or hdr.token_len > MAX_TOKEN_LEN)
                 return error.FormatError;
 
-            token = slice[0..hdr.token_len];
-            slice = slice[hdr.token_len..];
+            token = slice.get_bytes(hdr.token_len);
         }
 
         // For the first instance in a message, a preceding
@@ -100,12 +133,10 @@ pub const Parser = struct {
                 //  13: An 8-bit unsigned integer follows the initial byte and
                 //  indicates the Option Delta minus 13.
                 //
-                if (self.slice.len < 1)
-                    return error.EndOfStream;
+                if (self.slice.length() < 1)
+                    return error.FormatError;
 
-                const result: u8 = self.slice[0] + 13;
-                self.slice = self.slice[1..];
-
+                const result = self.slice.get_u8() + 13;
                 return @as(u16, result);
             },
             14 => {
@@ -114,13 +145,10 @@ pub const Parser = struct {
                 //  14: A 16-bit unsigned integer in network byte order follows the
                 //  initial byte and indicates the Option Delta minus 269.
                 //
-                if (self.slice.len < 2)
+                if (self.slice.length() < 2)
                     return error.FormatError;
 
-                // TODO: get_and_advance option for slice
-                const result: u16 = @bitCast(u16, self.slice[0..@sizeOf(u16)].*);
-                self.slice = self.slice[@sizeOf(u16)..];
-
+                const result = self.slice.get_u16();
                 return std.mem.bigToNative(u16, result) + 269;
             },
             15 => {
@@ -137,32 +165,29 @@ pub const Parser = struct {
     fn next_option(self: *Parser) !?Option {
         if (self.last_option == null)
             return null;
-        if (self.slice.len < 1)
+        if (self.slice.length() < 1)
             return error.EndOfStream;
 
-        const option = self.slice[0];
+        const option = self.slice.get_u8();
         if (option == OPTION_END) {
             self.last_option = null;
-            if (self.slice.len > 1)
-                self.payload = &self.slice[1]; // byte after OPTION_END
+            if (self.slice.length() < 1) {
+                // For zero-length payload OPTION_END should not be set.
+                return error.InvalidPayload;
+            } else {
+                self.payload = self.slice.get_ptr();
+            }
             return null;
         }
-
-        // Advance slice since decode_value access it.
-        // XXX: reset slice position on decode_value error?
-        self.slice = self.slice[1..];
 
         const delta = try self.decode_value(option >> 4);
         const len = try self.decode_value(option & 0xf);
 
         var optnum = self.last_option.?.number + delta;
 
-        const value = self.slice[0..len];
-        self.slice = self.slice[len..];
-
         const ret = Option{
             .number = optnum,
-            .value  = value,
+            .value  = self.slice.get_bytes(len),
         };
         self.last_option = ret;
         return ret;
