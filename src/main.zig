@@ -45,9 +45,7 @@ pub const Parser = struct {
     slice: []const u8,
     token: ?[]const u8,
     payload: ?*const u8,
-    // For the first instance in a message, a preceding
-    // option instance with Option Number zero is assumed.
-    option_nr: u32 = 0,
+    last_option: ?Option,
 
     const MAX_TOKEN_LEN = 8;
     const OPTION_END = 0xff;
@@ -81,10 +79,11 @@ pub const Parser = struct {
         }
 
         return Parser{
-            .header  = hdr,
-            .token   = token,
-            .slice   = slice,
-            .payload = null,
+            .header      = hdr,
+            .token       = token,
+            .slice       = slice,
+            .payload     = null,
+            .last_option = null,
         };
     }
 
@@ -150,13 +149,18 @@ pub const Parser = struct {
         const delta = try self.decode_value(option >> 4);
         const len = try self.decode_value(option & 0xf);
 
-        self.option_nr += delta;
+        // For the first instance in a message, a preceding
+        // option instance with Option Number zero is assumed.
+        var optnum: u32 = 0;
+        if (self.last_option != null)
+            optnum = (self.last_option.?).number;
+        optnum += delta;
 
         const value = self.slice[0..len];
         self.slice = self.slice[len..];
 
         return Option{
-            .number = self.option_nr,
+            .number = optnum,
             .value  = value,
         };
     }
