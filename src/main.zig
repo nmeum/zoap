@@ -43,29 +43,44 @@ pub const Option = struct {
 const Buffer = struct {
     slice: []const u8,
 
-    pub fn get_u8(self: *Buffer) u8 {
+    pub fn get_u8(self: *Buffer) !u8 {
+        if (self.slice.len < @sizeOf(u8))
+            return error.OutOfBounds;
+
         const result = self.slice[0];
         self.slice = self.slice[@sizeOf(u8)..];
         return result;
     }
 
-    pub fn get_u16(self: *Buffer) u16 {
+    pub fn get_u16(self: *Buffer) !u16 {
+        if (self.slice.len < @sizeOf(u16))
+            return error.OutOfBounds;
+
         const result = self.slice[0..@sizeOf(u16)].*;
         self.slice = self.slice[@sizeOf(u16)..];
         return @bitCast(u16, result);
     }
 
-    pub fn get_u32(self: *Buffer) u32 {
+    pub fn get_u32(self: *Buffer) !u32 {
+        if (self.slice.len < @sizeOf(u32))
+            return error.OutOfBounds;
+
         const result = self.slice[0..@sizeOf(u32)].*;
         self.slice = self.slice[@sizeOf(u32)..];
         return @bitCast(u32, result);
     }
 
-    pub fn get_ptr(self: *Buffer) *const u8 {
+    pub fn get_ptr(self: *Buffer) !(*const u8) {
+        if (self.slice.len < 1)
+            return error.OutOfBounds;
+
         return &self.slice[0];
     }
 
-    pub fn get_bytes(self: *Buffer, numBytes: usize) []const u8 {
+    pub fn get_bytes(self: *Buffer, numBytes: usize) !([]const u8) {
+        if (self.slice.len < numBytes)
+            return error.OutOfBounds;
+
         const result = self.slice[0..numBytes];
         self.slice = self.slice[numBytes..];
         return result;
@@ -93,7 +108,7 @@ pub const Parser = struct {
 
         // Cast first four bytes to u32 and convert them to header struct
         const firstByte = slice.slice[0]; // XXX (see below)
-        const serialized: u32 = slice.get_u32();
+        const serialized: u32 = try slice.get_u32();
         var hdr = @bitCast(Header, serialized);
 
         // Convert message_id to a integer in host byteorder
@@ -105,10 +120,10 @@ pub const Parser = struct {
 
         var token: ?[]const u8 = null;
         if (hdr.token_len > 0) {
-            if (hdr.token_len > slice.length() or hdr.token_len > MAX_TOKEN_LEN)
+            if (hdr.token_len > MAX_TOKEN_LEN)
                 return error.FormatError;
 
-            token = slice.get_bytes(hdr.token_len);
+            token = slice.get_bytes(hdr.token_len) catch { return error.FormatError; };
         }
 
         // For the first instance in a message, a preceding
@@ -133,11 +148,8 @@ pub const Parser = struct {
                 //  13: An 8-bit unsigned integer follows the initial byte and
                 //  indicates the Option Delta minus 13.
                 //
-                if (self.slice.length() < 1)
-                    return error.FormatError;
-
-                const result = self.slice.get_u8() + 13;
-                return @as(u16, result);
+                const result = self.slice.get_u8() catch { return error.FormatError; };
+                return @as(u16, result + 13);
             },
             14 => {
                 // From RFC 7252:
@@ -145,10 +157,7 @@ pub const Parser = struct {
                 //  14: A 16-bit unsigned integer in network byte order follows the
                 //  initial byte and indicates the Option Delta minus 269.
                 //
-                if (self.slice.length() < 2)
-                    return error.FormatError;
-
-                const result = self.slice.get_u16();
+                const result = self.slice.get_u16() catch { return error.FormatError; };
                 return std.mem.bigToNative(u16, result) + 269;
             },
             15 => {
@@ -165,17 +174,15 @@ pub const Parser = struct {
     fn next_option(self: *Parser) !?Option {
         if (self.last_option == null)
             return null;
-        if (self.slice.length() < 1)
-            return error.EndOfStream;
 
-        const option = self.slice.get_u8();
+        const option = self.slice.get_u8() catch { return error.EndOfStream; };
         if (option == OPTION_END) {
             self.last_option = null;
             if (self.slice.length() < 1) {
                 // For zero-length payload OPTION_END should not be set.
                 return error.InvalidPayload;
             } else {
-                self.payload = self.slice.get_ptr();
+                self.payload = try self.slice.get_ptr();
             }
             return null;
         }
@@ -184,10 +191,11 @@ pub const Parser = struct {
         const len = try self.decode_value(option & 0xf);
 
         var optnum = self.last_option.?.number + delta;
+        var optval = self.slice.get_bytes(len) catch { return error.FormatError; };
 
         const ret = Option{
             .number = optnum,
-            .value  = self.slice.get_bytes(len),
+            .value  = optval,
         };
         self.last_option = ret;
         return ret;
