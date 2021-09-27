@@ -116,7 +116,7 @@ pub const Parser = struct {
 
                 // TODO: get_and_advance option for slice
                 const result: u16 = @bitCast(u16, self.slice[0..@sizeOf(u16)].*);
-                self.slice = self.slice[3..];
+                self.slice = self.slice[@sizeOf(u16)..];
 
                 return std.mem.bigToNative(u16, result) + 269;
             },
