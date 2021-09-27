@@ -10,7 +10,7 @@ const codes = @import("code.zig");
 //  number. Implementations of this specification MUST set this field
 //  to 1 (01 binary).
 //
-const Version: u2 = 1;
+pub const Version: u2 = 1;
 
 // CoAP message type.
 //
@@ -20,14 +20,14 @@ const Version: u2 = 1;
 //  Confirmable (0), Non-confirmable (1), Acknowledgement (2), or Reset
 //  (3).
 //
-const Mtype = enum(u2) {
+pub const Mtype = enum(u2) {
     confirmable = 0,
     non_confirmable = 1,
     acknowledgement = 2,
     reset = 3,
 };
 
-const Header = packed struct {
+pub const Header = packed struct {
     version: u2,
     type: Mtype,
     token_len: u4,
@@ -193,7 +193,7 @@ pub const Parser = struct {
         }
     }
 
-    fn skip_options(self: *Parser) !void {
+    pub fn skip_options(self: *Parser) !void {
         while (true) {
             var opt = self.next_option() catch |err| {
                 // The absence of the Payload Marker denotes a zero-length payload.
