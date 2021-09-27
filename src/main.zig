@@ -244,4 +244,7 @@ test "test find_option" {
     testing.expect(opt3.number == 50);
     const exp3: []const u8 = &[_]u8{1};
     testing.expect(std.mem.eql(u8, exp3, opt3.value));
+
+    // Attempting to access the second option should result in usage error
+    testing.expectError(error.InvalidArgument, par.find_option(23));
 }
