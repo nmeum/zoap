@@ -52,7 +52,7 @@ pub const Parser = struct {
     const OPTION_END = 0xff;
 
     pub fn init(buf: []const u8) !Parser {
-        var slice = buffer.Buffer{.slice = buf};
+        var slice = buffer.Buffer{ .slice = buf };
         if (buf.len < @sizeOf(Header))
             return error.FormatError;
 
@@ -73,18 +73,20 @@ pub const Parser = struct {
             if (hdr.token_len > MAX_TOKEN_LEN)
                 return error.FormatError;
 
-            token = slice.get_bytes(hdr.token_len) catch { return error.FormatError; };
+            token = slice.get_bytes(hdr.token_len) catch {
+                return error.FormatError;
+            };
         }
 
         // For the first instance in a message, a preceding
         // option instance with Option Number zero is assumed.
-        const init_option = Option{.number = 0, .value = &[_]u8{}};
+        const init_option = Option{ .number = 0, .value = &[_]u8{} };
 
         return Parser{
-            .header      = hdr,
-            .token       = token,
-            .slice       = slice,
-            .payload     = null,
+            .header = hdr,
+            .token = token,
+            .slice = slice,
+            .payload = null,
             .last_option = init_option,
         };
     }
@@ -98,7 +100,9 @@ pub const Parser = struct {
                 //  13: An 8-bit unsigned integer follows the initial byte and
                 //  indicates the Option Delta minus 13.
                 //
-                const result = self.slice.get_u8() catch { return error.FormatError; };
+                const result = self.slice.get_u8() catch {
+                    return error.FormatError;
+                };
                 return @as(u16, result + 13);
             },
             14 => {
@@ -107,7 +111,9 @@ pub const Parser = struct {
                 //  14: A 16-bit unsigned integer in network byte order follows the
                 //  initial byte and indicates the Option Delta minus 269.
                 //
-                const result = self.slice.get_u16() catch { return error.FormatError; };
+                const result = self.slice.get_u16() catch {
+                    return error.FormatError;
+                };
                 return std.mem.bigToNative(u16, result) + 269;
             },
             15 => {
@@ -129,7 +135,9 @@ pub const Parser = struct {
         if (self.last_option == null)
             return null;
 
-        const option = self.slice.get_u8() catch { return error.EndOfStream; };
+        const option = self.slice.get_u8() catch {
+            return error.EndOfStream;
+        };
         if (option == OPTION_END) {
             self.last_option = null;
             if (self.slice.length() < 1) {
@@ -145,11 +153,13 @@ pub const Parser = struct {
         const len = try self.decode_value(option & 0xf);
 
         var optnum = self.last_option.?.number + delta;
-        var optval = self.slice.get_bytes(len) catch { return error.FormatError; };
+        var optval = self.slice.get_bytes(len) catch {
+            return error.FormatError;
+        };
 
         const ret = Option{
             .number = optnum,
-            .value  = optval,
+            .value = optval,
         };
 
         self.last_option = ret;
@@ -168,9 +178,8 @@ pub const Parser = struct {
 
         while (true) {
             const next = try self.next_option();
-            if (next == null) {
+            if (next == null)
                 return error.EndOfOptions;
-            }
 
             const opt = next.?;
             if (opt.number == optnum) {
@@ -196,7 +205,7 @@ pub const Parser = struct {
 };
 
 test "test header parser" {
-    const buf: []const u8 = &[_]u8{0x41, 0x01, 0x09, 0x26, 0x17};
+    const buf: []const u8 = &[_]u8{ 0x41, 0x01, 0x09, 0x26, 0x17 };
     const par = try Parser.init(buf);
     const hdr = par.header;
 
@@ -209,7 +218,7 @@ test "test header parser" {
 }
 
 test "test payload parsing" {
-    const buf: []const u8 = &[_]u8{0x62, 0x03, 0x04, 0xd2, 0xdd, 0x64, 0xff, 0x17, 0x2a, 0x0d, 0x25};
+    const buf: []const u8 = &[_]u8{ 0x62, 0x03, 0x04, 0xd2, 0xdd, 0x64, 0xff, 0x17, 0x2a, 0x0d, 0x25 };
     var par = try Parser.init(buf);
 
     try par.skip_options();
@@ -217,7 +226,7 @@ test "test payload parsing" {
 }
 
 test "test option parser" {
-    const buf: []const u8 = &[_]u8{0x41, 0x01, 0x09, 0x26, 0x17, 0xd2, 0x0a, 0x0d, 0x25};
+    const buf: []const u8 = &[_]u8{ 0x41, 0x01, 0x09, 0x26, 0x17, 0xd2, 0x0a, 0x0d, 0x25 };
     var par = try Parser.init(buf);
 
     const next_opt = try par.next_option();
@@ -231,13 +240,13 @@ test "test option parser" {
 }
 
 test "test find_option" {
-    const buf: []const u8 = &[_]u8{0x51, 0x01, 0x30, 0x39, 0x05, 0xd4, 0x0a, 0x01, 0x02, 0x03, 0x04, 0xd1, 0x06, 0x17, 0x81, 0x01};
+    const buf: []const u8 = &[_]u8{ 0x51, 0x01, 0x30, 0x39, 0x05, 0xd4, 0x0a, 0x01, 0x02, 0x03, 0x04, 0xd1, 0x06, 0x17, 0x81, 0x01 };
     var par = try Parser.init(buf);
 
     // First option
     const opt1 = try par.find_option(23);
     testing.expect(opt1.number == 23);
-    const exp1: []const u8 = &[_]u8{1, 2, 3, 4};
+    const exp1: []const u8 = &[_]u8{ 1, 2, 3, 4 };
     testing.expect(std.mem.eql(u8, exp1, opt1.value));
 
     // Third option, skipping second
