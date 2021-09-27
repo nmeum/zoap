@@ -78,12 +78,16 @@ pub const Parser = struct {
             slice = slice[hdr.token_len..];
         }
 
+        // For the first instance in a message, a preceding
+        // option instance with Option Number zero is assumed.
+        const init_option = Option{.number = 0, .value = &[_]u8{}};
+
         return Parser{
             .header      = hdr,
             .token       = token,
             .slice       = slice,
             .payload     = null,
-            .last_option = null,
+            .last_option = init_option,
         };
     }
 
@@ -131,11 +135,14 @@ pub const Parser = struct {
     // TODO: Comptime to enforce order of functions calls (e.g. no next_option after skip_options)
 
     fn next_option(self: *Parser) !?Option {
+        if (self.last_option == null)
+            return null;
         if (self.slice.len < 1)
             return error.EndOfStream;
 
         const option = self.slice[0];
         if (option == OPTION_END) {
+            self.last_option = null;
             if (self.slice.len > 1)
                 self.payload = &self.slice[1]; // byte after OPTION_END
             return null;
@@ -148,12 +155,7 @@ pub const Parser = struct {
         const delta = try self.decode_value(option >> 4);
         const len = try self.decode_value(option & 0xf);
 
-        // For the first instance in a message, a preceding
-        // option instance with Option Number zero is assumed.
-        var optnum: u32 = 0;
-        if (self.last_option != null)
-            optnum = (self.last_option.?).number;
-        optnum += delta;
+        var optnum = self.last_option.?.number + delta;
 
         const value = self.slice[0..len];
         self.slice = self.slice[len..];
@@ -167,7 +169,13 @@ pub const Parser = struct {
     }
 
     pub fn find_option(self: *Parser, optnum: u32) !Option {
-        if (self.last_option != null and self.last_option.?.number >= optnum)
+        if (optnum == 0)
+            return error.InvalidArgument;
+        if (self.last_option == null)
+            return error.EndOfOptions;
+
+        const n = self.last_option.?.number;
+        if (n > 0 and n >= optnum)
             return error.InvalidArgument;
 
         while (true) {
@@ -187,7 +195,12 @@ pub const Parser = struct {
 
     fn skip_options(self: *Parser) !void {
         while (true) {
-            var opt = try self.next_option();
+            var opt = self.next_option() catch |err| {
+                // The absence of the Payload Marker denotes a zero-length payload.
+                if (err == error.EndOfStream)
+                    return error.ZeroLengthPayload;
+                return err;
+            };
             if (opt == null)
                 break;
         }
@@ -247,4 +260,7 @@ test "test find_option" {
 
     // Attempting to access the second option should result in usage error
     testing.expectError(error.InvalidArgument, par.find_option(23));
+
+    // Skipping options and accessing payload should work.
+    testing.expectError(error.ZeroLengthPayload, par.skip_options());
 }
