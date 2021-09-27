@@ -114,6 +114,7 @@ pub const Parser = struct {
                 if (self.slice.len < 2)
                     return error.FormatError;
 
+                // TODO: get_and_advance option for slice
                 const result: u16 = @bitCast(u16, self.slice[0..@sizeOf(u16)].*);
                 self.slice = self.slice[3..];
 
@@ -127,6 +128,9 @@ pub const Parser = struct {
             },
         }
     }
+
+    // TODO: Comptime to enforce order of functions calls (e.g. no next_option after skip_options)
+    // TODO: find_option
 
     fn next_option(self: *Parser) !?Option {
         if (self.slice.len < 1)
