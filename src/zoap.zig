@@ -2,6 +2,7 @@ const std = @import("std");
 const testing = std.testing;
 const codes = @import("code.zig");
 const buffer = @import("buffer.zig");
+const options = @import("options.zig");
 
 // CoAP version implemented by this library.
 //
@@ -36,17 +37,12 @@ pub const Header = packed struct {
     message_id: u16,
 };
 
-pub const Option = struct {
-    number: u32,
-    value: []const u8,
-};
-
 pub const Parser = struct {
     header: Header,
     slice: buffer.Buffer,
     token: ?[]const u8,
     payload: ?*const u8,
-    last_option: ?Option,
+    last_option: ?options.Option,
 
     const MAX_TOKEN_LEN = 8;
     const OPTION_END = 0xff;
@@ -80,7 +76,7 @@ pub const Parser = struct {
 
         // For the first instance in a message, a preceding
         // option instance with Option Number zero is assumed.
-        const init_option = Option{ .number = 0, .value = &[_]u8{} };
+        const init_option = options.Option{ .number = 0, .value = &[_]u8{} };
 
         return Parser{
             .header = hdr,
@@ -131,7 +127,7 @@ pub const Parser = struct {
     }
 
     // TODO: comptime to enforce order of functions calls (e.g. no next_option after skip_options)
-    fn next_option(self: *Parser) !?Option {
+    fn next_option(self: *Parser) !?options.Option {
         if (self.last_option == null)
             return null;
 
@@ -157,7 +153,7 @@ pub const Parser = struct {
             return error.FormatError;
         };
 
-        const ret = Option{
+        const ret = options.Option{
             .number = optnum,
             .value = optval,
         };
@@ -166,7 +162,7 @@ pub const Parser = struct {
         return ret;
     }
 
-    pub fn find_option(self: *Parser, optnum: u32) !Option {
+    pub fn find_option(self: *Parser, optnum: u32) !options.Option {
         if (optnum == 0)
             return error.InvalidArgument;
         if (self.last_option == null)
