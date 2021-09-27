@@ -129,7 +129,6 @@ pub const Parser = struct {
     }
 
     // TODO: Comptime to enforce order of functions calls (e.g. no next_option after skip_options)
-    // TODO: find_option
 
     fn next_option(self: *Parser) !?Option {
         if (self.slice.len < 1)
@@ -165,6 +164,25 @@ pub const Parser = struct {
         };
         self.last_option = ret;
         return ret;
+    }
+
+    pub fn find_option(self: *Parser, optnum: u32) !Option {
+        if (self.last_option != null and self.last_option.?.number >= optnum)
+            return error.InvalidArgument;
+
+        while (true) {
+            const next = try self.next_option();
+            if (next == null) {
+                return error.EndOfOptions;
+            }
+
+            const opt = next.?;
+            if (opt.number == optnum) {
+                return opt;
+            } else if (opt.number > optnum) {
+                return error.OptionNotFound;
+            }
+        }
     }
 
     fn skip_options(self: *Parser) !void {
@@ -209,4 +227,21 @@ test "test option parser" {
     testing.expect(val.len == 2);
     testing.expect(val[0] == 13);
     testing.expect(val[1] == 37);
+}
+
+test "test find_option" {
+    const buf: []const u8 = &[_]u8{0x51, 0x01, 0x30, 0x39, 0x05, 0xd4, 0x0a, 0x01, 0x02, 0x03, 0x04, 0xd1, 0x06, 0x17, 0x81, 0x01};
+    var par = try Parser.init(buf);
+
+    // First option
+    const opt1 = try par.find_option(23);
+    testing.expect(opt1.number == 23);
+    const exp1: []const u8 = &[_]u8{1, 2, 3, 4};
+    testing.expect(std.mem.eql(u8, exp1, opt1.value));
+
+    // Third option, skipping second
+    const opt3 = try par.find_option(50);
+    testing.expect(opt3.number == 50);
+    const exp3: []const u8 = &[_]u8{1};
+    testing.expect(std.mem.eql(u8, exp3, opt3.value));
 }
