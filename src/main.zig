@@ -159,10 +159,12 @@ pub const Parser = struct {
         const value = self.slice[0..len];
         self.slice = self.slice[len..];
 
-        return Option{
+        const ret = Option{
             .number = optnum,
             .value  = value,
         };
+        self.last_option = ret;
+        return ret;
     }
 
     fn skip_options(self: *Parser) !void {
