@@ -5,9 +5,9 @@ A toy parser for the [CoAP][coap rfc] message format.
 ## Status
 
 This is just intended a small experiment with the
-[Zig programming language][zig web]. The isn't creating a complete
+[Zig programming language][zig web]. The goal isn't creating a complete
 standard-compliant implementation of CoAP in Zig. However, this toy
-implementation is used in [zig-riscv-embedded][zig-riscv github].
+implementation is used presently in [zig-riscv-embedded][zig-riscv github].
 
 ## Installation
 
