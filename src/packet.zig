@@ -2,8 +2,8 @@ const std = @import("std");
 const testing = std.testing;
 const buffer = @import("buffer.zig");
 
-pub const codes = @import("code.zig");
-pub const options = @import("options.zig");
+const codes = @import("code.zig");
+const options = @import("options.zig");
 
 // CoAP version implemented by this library.
 //
