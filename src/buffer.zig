@@ -1,7 +1,7 @@
 pub const Buffer = struct {
     slice: []const u8,
 
-    pub fn get_u8(self: *Buffer) !u8 {
+    pub fn byte(self: *Buffer) !u8 {
         if (self.slice.len < @sizeOf(u8))
             return error.OutOfBounds;
 
@@ -10,7 +10,7 @@ pub const Buffer = struct {
         return result;
     }
 
-    pub fn get_u16(self: *Buffer) !u16 {
+    pub fn half(self: *Buffer) !u16 {
         if (self.slice.len < @sizeOf(u16))
             return error.OutOfBounds;
 
@@ -19,7 +19,7 @@ pub const Buffer = struct {
         return @bitCast(u16, result);
     }
 
-    pub fn get_u32(self: *Buffer) !u32 {
+    pub fn word(self: *Buffer) !u32 {
         if (self.slice.len < @sizeOf(u32))
             return error.OutOfBounds;
 
@@ -28,14 +28,14 @@ pub const Buffer = struct {
         return @bitCast(u32, result);
     }
 
-    pub fn get_ptr(self: *Buffer) !(*const u8) {
+    pub fn ptr(self: *Buffer) !(*const u8) {
         if (self.slice.len < 1)
             return error.OutOfBounds;
 
         return &self.slice[0];
     }
 
-    pub fn get_bytes(self: *Buffer, numBytes: usize) !([]const u8) {
+    pub fn bytes(self: *Buffer, numBytes: usize) !([]const u8) {
         if (self.slice.len < numBytes)
             return error.OutOfBounds;
 

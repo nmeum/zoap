@@ -55,7 +55,7 @@ pub const Parser = struct {
 
         // Cast first four bytes to u32 and convert them to header struct
         const firstByte = slice.slice[0]; // XXX (see below)
-        const serialized: u32 = try slice.get_u32();
+        const serialized: u32 = try slice.word();
         var hdr = @bitCast(Header, serialized);
 
         // Convert message_id to a integer in host byteorder
@@ -70,7 +70,7 @@ pub const Parser = struct {
             if (hdr.token_len > MAX_TOKEN_LEN)
                 return error.FormatError;
 
-            token = slice.get_bytes(hdr.token_len) catch {
+            token = slice.bytes(hdr.token_len) catch {
                 return error.FormatError;
             };
         }
@@ -89,7 +89,7 @@ pub const Parser = struct {
     }
 
     // https://datatracker.ietf.org/doc/html/rfc7252#section-3.1
-    fn decode_value(self: *Parser, val: u8) !u16 {
+    fn decodeValue(self: *Parser, val: u8) !u16 {
         switch (val) {
             13 => {
                 // From RFC 7252:
@@ -97,7 +97,7 @@ pub const Parser = struct {
                 //  13: An 8-bit unsigned integer follows the initial byte and
                 //  indicates the Option Delta minus 13.
                 //
-                const result = self.slice.get_u8() catch {
+                const result = self.slice.byte() catch {
                     return error.FormatError;
                 };
                 return @as(u16, result + 13);
@@ -108,7 +108,7 @@ pub const Parser = struct {
                 //  14: A 16-bit unsigned integer in network byte order follows the
                 //  initial byte and indicates the Option Delta minus 269.
                 //
-                const result = self.slice.get_u16() catch {
+                const result = self.slice.half() catch {
                     return error.FormatError;
                 };
                 return std.mem.bigToNative(u16, result) + 269;
@@ -127,12 +127,12 @@ pub const Parser = struct {
         }
     }
 
-    // TODO: comptime to enforce order of functions calls (e.g. no next_option after skip_options)
+    // TODO: comptime to enforce order of functions calls (e.g. no next_option after skipOptions)
     fn next_option(self: *Parser) !?options.Option {
         if (self.last_option == null)
             return null;
 
-        const option = self.slice.get_u8() catch {
+        const option = self.slice.byte() catch {
             return error.EndOfStream;
         };
         if (option == OPTION_END) {
@@ -141,16 +141,16 @@ pub const Parser = struct {
                 // For zero-length payload OPTION_END should not be set.
                 return error.InvalidPayload;
             } else {
-                self.payload = try self.slice.get_ptr();
+                self.payload = try self.slice.ptr();
             }
             return null;
         }
 
-        const delta = try self.decode_value(option >> 4);
-        const len = try self.decode_value(option & 0xf);
+        const delta = try self.decodeValue(option >> 4);
+        const len = try self.decodeValue(option & 0xf);
 
         var optnum = self.last_option.?.number + delta;
-        var optval = self.slice.get_bytes(len) catch {
+        var optval = self.slice.bytes(len) catch {
             return error.FormatError;
         };
 
@@ -163,7 +163,7 @@ pub const Parser = struct {
         return ret;
     }
 
-    pub fn find_option(self: *Parser, optnum: u32) !options.Option {
+    pub fn findOption(self: *Parser, optnum: u32) !options.Option {
         if (optnum == 0)
             return error.InvalidArgument;
         if (self.last_option == null)
@@ -187,7 +187,7 @@ pub const Parser = struct {
         }
     }
 
-    pub fn skip_options(self: *Parser) !void {
+    pub fn skipOptions(self: *Parser) !void {
         while (true) {
             var opt = self.next_option() catch |err| {
                 // The absence of the Payload Marker denotes a zero-length payload.
@@ -218,7 +218,7 @@ test "test payload parsing" {
     const buf: []const u8 = &[_]u8{ 0x62, 0x03, 0x04, 0xd2, 0xdd, 0x64, 0xff, 0x17, 0x2a, 0x0d, 0x25 };
     var par = try Parser.init(buf);
 
-    try par.skip_options();
+    try par.skipOptions();
     testing.expect(par.payload.? == &buf[7]);
 }
 
@@ -236,25 +236,25 @@ test "test option parser" {
     testing.expect(val[1] == 37);
 }
 
-test "test find_option" {
+test "test findOption" {
     const buf: []const u8 = &[_]u8{ 0x51, 0x01, 0x30, 0x39, 0x05, 0xd4, 0x0a, 0x01, 0x02, 0x03, 0x04, 0xd1, 0x06, 0x17, 0x81, 0x01 };
     var par = try Parser.init(buf);
 
     // First option
-    const opt1 = try par.find_option(23);
+    const opt1 = try par.findOption(23);
     testing.expect(opt1.number == 23);
     const exp1: []const u8 = &[_]u8{ 1, 2, 3, 4 };
     testing.expect(std.mem.eql(u8, exp1, opt1.value));
 
     // Third option, skipping second
-    const opt3 = try par.find_option(50);
+    const opt3 = try par.findOption(50);
     testing.expect(opt3.number == 50);
     const exp3: []const u8 = &[_]u8{1};
     testing.expect(std.mem.eql(u8, exp3, opt3.value));
 
     // Attempting to access the second option should result in usage error
-    testing.expectError(error.InvalidArgument, par.find_option(23));
+    testing.expectError(error.InvalidArgument, par.findOption(23));
 
     // Skipping options and accessing payload should work.
-    testing.expectError(error.ZeroLengthPayload, par.skip_options());
+    testing.expectError(error.ZeroLengthPayload, par.skipOptions());
 }
