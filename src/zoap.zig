@@ -38,7 +38,7 @@ pub const Header = packed struct {
     message_id: u16,
 };
 
-pub const Parser = struct {
+pub const Packet = struct {
     header: Header,
     slice: buffer.Buffer,
     token: ?[]const u8,
@@ -48,7 +48,7 @@ pub const Parser = struct {
     const MAX_TOKEN_LEN = 8;
     const OPTION_END = 0xff;
 
-    pub fn init(buf: []const u8) !Parser {
+    pub fn init(buf: []const u8) !Packet {
         var slice = buffer.Buffer{ .slice = buf };
         if (buf.len < @sizeOf(Header))
             return error.FormatError;
@@ -79,7 +79,7 @@ pub const Parser = struct {
         // option instance with Option Number zero is assumed.
         const init_option = options.Option{ .number = 0, .value = &[_]u8{} };
 
-        return Parser{
+        return Packet{
             .header = hdr,
             .token = token,
             .slice = slice,
@@ -89,7 +89,7 @@ pub const Parser = struct {
     }
 
     // https://datatracker.ietf.org/doc/html/rfc7252#section-3.1
-    fn decodeValue(self: *Parser, val: u8) !u16 {
+    fn decodeValue(self: *Packet, val: u8) !u16 {
         switch (val) {
             13 => {
                 // From RFC 7252:
@@ -128,7 +128,7 @@ pub const Parser = struct {
     }
 
     // TODO: comptime to enforce order of functions calls (e.g. no next_option after skipOptions)
-    fn next_option(self: *Parser) !?options.Option {
+    fn next_option(self: *Packet) !?options.Option {
         if (self.last_option == null)
             return null;
 
@@ -163,7 +163,7 @@ pub const Parser = struct {
         return ret;
     }
 
-    pub fn findOption(self: *Parser, optnum: u32) !options.Option {
+    pub fn findOption(self: *Packet, optnum: u32) !options.Option {
         if (optnum == 0)
             return error.InvalidArgument;
         if (self.last_option == null)
@@ -187,7 +187,7 @@ pub const Parser = struct {
         }
     }
 
-    pub fn skipOptions(self: *Parser) !void {
+    pub fn skipOptions(self: *Packet) !void {
         while (true) {
             var opt = self.next_option() catch |err| {
                 // The absence of the Payload Marker denotes a zero-length payload.
@@ -203,7 +203,7 @@ pub const Parser = struct {
 
 test "test header parser" {
     const buf: []const u8 = &[_]u8{ 0x41, 0x01, 0x09, 0x26, 0x17 };
-    const par = try Parser.init(buf);
+    const par = try Packet.init(buf);
     const hdr = par.header;
 
     testing.expect(hdr.version == Version);
@@ -216,7 +216,7 @@ test "test header parser" {
 
 test "test payload parsing" {
     const buf: []const u8 = &[_]u8{ 0x62, 0x03, 0x04, 0xd2, 0xdd, 0x64, 0xff, 0x17, 0x2a, 0x0d, 0x25 };
-    var par = try Parser.init(buf);
+    var par = try Packet.init(buf);
 
     try par.skipOptions();
     testing.expect(par.payload.? == &buf[7]);
@@ -224,7 +224,7 @@ test "test payload parsing" {
 
 test "test option parser" {
     const buf: []const u8 = &[_]u8{ 0x41, 0x01, 0x09, 0x26, 0x17, 0xd2, 0x0a, 0x0d, 0x25 };
-    var par = try Parser.init(buf);
+    var par = try Packet.init(buf);
 
     const next_opt = try par.next_option();
     const opt = next_opt.?;
@@ -238,7 +238,7 @@ test "test option parser" {
 
 test "test findOption" {
     const buf: []const u8 = &[_]u8{ 0x51, 0x01, 0x30, 0x39, 0x05, 0xd4, 0x0a, 0x01, 0x02, 0x03, 0x04, 0xd1, 0x06, 0x17, 0x81, 0x01 };
-    var par = try Parser.init(buf);
+    var par = try Packet.init(buf);
 
     // First option
     const opt1 = try par.findOption(23);
