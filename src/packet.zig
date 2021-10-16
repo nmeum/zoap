@@ -38,7 +38,7 @@ pub const Header = packed struct {
     message_id: u16,
 };
 
-pub const Packet = struct {
+pub const Request = struct {
     header: Header,
     slice: buffer.Buffer,
     token: ?[]const u8,
@@ -48,7 +48,7 @@ pub const Packet = struct {
     const MAX_TOKEN_LEN = 8;
     const OPTION_END = 0xff;
 
-    pub fn init(buf: []const u8) !Packet {
+    pub fn init(buf: []const u8) !Request {
         var slice = buffer.Buffer{ .slice = buf };
         if (buf.len < @sizeOf(Header))
             return error.FormatError;
@@ -79,7 +79,7 @@ pub const Packet = struct {
         // option instance with Option Number zero is assumed.
         const init_option = options.Option{ .number = 0, .value = &[_]u8{} };
 
-        return Packet{
+        return Request{
             .header = hdr,
             .token = token,
             .slice = slice,
@@ -89,7 +89,7 @@ pub const Packet = struct {
     }
 
     // https://datatracker.ietf.org/doc/html/rfc7252#section-3.1
-    fn decodeValue(self: *Packet, val: u8) !u16 {
+    fn decodeValue(self: *Request, val: u8) !u16 {
         switch (val) {
             13 => {
                 // From RFC 7252:
@@ -128,7 +128,7 @@ pub const Packet = struct {
     }
 
     // TODO: comptime to enforce order of functions calls (e.g. no next_option after skipOptions)
-    fn next_option(self: *Packet) !?options.Option {
+    fn next_option(self: *Request) !?options.Option {
         if (self.last_option == null)
             return null;
 
@@ -163,7 +163,7 @@ pub const Packet = struct {
         return ret;
     }
 
-    pub fn findOption(self: *Packet, optnum: u32) !options.Option {
+    pub fn findOption(self: *Request, optnum: u32) !options.Option {
         if (optnum == 0)
             return error.InvalidArgument;
         if (self.last_option == null)
@@ -187,7 +187,7 @@ pub const Packet = struct {
         }
     }
 
-    pub fn skipOptions(self: *Packet) !void {
+    pub fn skipOptions(self: *Request) !void {
         while (true) {
             var opt = self.next_option() catch |err| {
                 // The absence of the Payload Marker denotes a zero-length payload.
@@ -203,30 +203,30 @@ pub const Packet = struct {
 
 test "test header parser" {
     const buf: []const u8 = &[_]u8{ 0x41, 0x01, 0x09, 0x26, 0x17 };
-    const par = try Packet.init(buf);
-    const hdr = par.header;
+    const req = try Request.init(buf);
+    const hdr = req.header;
 
     testing.expect(hdr.version == VERSION);
     testing.expect(hdr.type == Mtype.confirmable);
     testing.expect(hdr.token_len == 1);
-    testing.expect(par.token.?[0] == 23);
+    testing.expect(req.token.?[0] == 23);
     testing.expect(hdr.code.equal(codes.GET));
     testing.expect(hdr.message_id == 2342);
 }
 
 test "test payload parsing" {
     const buf: []const u8 = &[_]u8{ 0x62, 0x03, 0x04, 0xd2, 0xdd, 0x64, 0xff, 0x17, 0x2a, 0x0d, 0x25 };
-    var par = try Packet.init(buf);
+    var req = try Request.init(buf);
 
-    try par.skipOptions();
-    testing.expect(par.payload.? == &buf[7]);
+    try req.skipOptions();
+    testing.expect(req.payload.? == &buf[7]);
 }
 
 test "test option parser" {
     const buf: []const u8 = &[_]u8{ 0x41, 0x01, 0x09, 0x26, 0x17, 0xd2, 0x0a, 0x0d, 0x25 };
-    var par = try Packet.init(buf);
+    var req = try Request.init(buf);
 
-    const next_opt = try par.next_option();
+    const next_opt = try req.next_option();
     const opt = next_opt.?;
     const val = opt.value;
 
@@ -238,23 +238,23 @@ test "test option parser" {
 
 test "test findOption" {
     const buf: []const u8 = &[_]u8{ 0x51, 0x01, 0x30, 0x39, 0x05, 0xd4, 0x0a, 0x01, 0x02, 0x03, 0x04, 0xd1, 0x06, 0x17, 0x81, 0x01 };
-    var par = try Packet.init(buf);
+    var req = try Request.init(buf);
 
     // First option
-    const opt1 = try par.findOption(23);
+    const opt1 = try req.findOption(23);
     testing.expect(opt1.number == 23);
     const exp1: []const u8 = &[_]u8{ 1, 2, 3, 4 };
     testing.expect(std.mem.eql(u8, exp1, opt1.value));
 
     // Third option, skipping second
-    const opt3 = try par.findOption(50);
+    const opt3 = try req.findOption(50);
     testing.expect(opt3.number == 50);
     const exp3: []const u8 = &[_]u8{1};
     testing.expect(std.mem.eql(u8, exp3, opt3.value));
 
     // Attempting to access the second option should result in usage error
-    testing.expectError(error.InvalidArgument, par.findOption(23));
+    testing.expectError(error.InvalidArgument, req.findOption(23));
 
     // Skipping options and accessing payload should work.
-    testing.expectError(error.ZeroLengthPayload, par.skipOptions());
+    testing.expectError(error.ZeroLengthPayload, req.skipOptions());
 }
