@@ -1,3 +1,18 @@
+const mem = @import("std").mem;
+
+pub const WriteBuffer = struct {
+    slice: []u8,
+    pos: usize = 0,
+
+    pub fn word(self: *WriteBuffer, w: u32) !void {
+        if (self.slice.len - self.pos < @sizeOf(u32))
+            return error.OutOfBounds;
+
+        mem.copy(u8, self.slice[self.pos..], mem.asBytes(&w));
+        self.pos += @sizeOf(u32);
+    }
+};
+
 pub const ReadBuffer = struct {
     slice: []const u8,
 

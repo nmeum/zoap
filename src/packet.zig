@@ -38,6 +38,54 @@ pub const Header = packed struct {
     message_id: u16,
 };
 
+pub const Response = struct {
+    header: Header,
+    token: []const u8,
+    buffer: buffer.WriteBuffer,
+
+    pub fn init(buf: []u8, mtype: Mtype, code: codes.Code, token: []const u8, id: u16) !Response {
+        var hdr = Header{
+            .version = VERSION,
+            .type = mtype,
+            .token_len = @intCast(u4, token.len),
+            .code = code,
+            .message_id = id,
+        };
+
+        var r = Response{
+            .header = hdr,
+            .token = token,
+            .buffer = .{.slice = buf},
+        };
+
+        // Convert message ID to network byte order.
+        hdr.message_id = std.mem.nativeToBig(u16, hdr.message_id);
+
+        const serialized = @bitCast(u32, hdr);
+        try r.buffer.word(serialized);
+
+        // Serialization of token_len is broken due to compiler bug.
+        r.buffer.slice[0] = (0x1 << 6) | (@intCast(u8, @enumToInt(mtype)) << 4) | @intCast(u4, token.len);
+
+        return r;
+    }
+
+    pub fn marshal(self: *Response) []u8 {
+        return self.buffer.slice;
+    }
+};
+
+test "test header serialization" {
+    const exp: []const u8 = &[_]u8{ 0x41, 0x01, 0x09, 0x26 };
+
+    var buf = [_]u8{0} ** exp.len;
+    var resp = try Response.init(&buf, Mtype.confirmable,
+                                 codes.GET, &[_]u8{ 23 }, 2342);
+
+    const serialized = resp.marshal();
+    testing.expect(std.mem.eql(u8, serialized, exp));
+}
+
 pub const Request = struct {
     header: Header,
     slice: buffer.ReadBuffer,
