@@ -40,7 +40,7 @@ pub const Header = packed struct {
 
 pub const Request = struct {
     header: Header,
-    slice: buffer.Buffer,
+    slice: buffer.ReadBuffer,
     token: ?[]const u8,
     payload: ?*const u8,
     last_option: ?options.Option,
@@ -49,7 +49,7 @@ pub const Request = struct {
     const OPTION_END = 0xff;
 
     pub fn init(buf: []const u8) !Request {
-        var slice = buffer.Buffer{ .slice = buf };
+        var slice = buffer.ReadBuffer{ .slice = buf };
         if (buf.len < @sizeOf(Header))
             return error.FormatError;
 
