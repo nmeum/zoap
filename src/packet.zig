@@ -13,7 +13,7 @@ const options = @import("options.zig");
 //  number. Implementations of this specification MUST set this field
 //  to 1 (01 binary).
 //
-pub const Version: u2 = 1;
+pub const VERSION: u2 = 1;
 
 // CoAP message type.
 //
@@ -206,7 +206,7 @@ test "test header parser" {
     const par = try Packet.init(buf);
     const hdr = par.header;
 
-    testing.expect(hdr.version == Version);
+    testing.expect(hdr.version == VERSION);
     testing.expect(hdr.type == Mtype.confirmable);
     testing.expect(hdr.token_len == 1);
     testing.expect(par.token.?[0] == 23);
