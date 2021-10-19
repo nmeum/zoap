@@ -175,8 +175,8 @@ pub const Request = struct {
         }
     }
 
-    // TODO: comptime to enforce order of functions calls (e.g. no next_option after skipOptions)
-    fn next_option(self: *Request) !?options.Option {
+    // TODO: comptime to enforce order of functions calls (e.g. no nextOption after skipOptions)
+    fn nextOption(self: *Request) !?options.Option {
         if (self.last_option == null)
             return null;
 
@@ -222,7 +222,7 @@ pub const Request = struct {
             return error.InvalidArgument;
 
         while (true) {
-            const next = try self.next_option();
+            const next = try self.nextOption();
             if (next == null)
                 return error.EndOfOptions;
 
@@ -237,7 +237,7 @@ pub const Request = struct {
 
     pub fn skipOptions(self: *Request) !void {
         while (true) {
-            var opt = self.next_option() catch |err| {
+            var opt = self.nextOption() catch |err| {
                 // The absence of the Payload Marker denotes a zero-length payload.
                 if (err == error.EndOfStream)
                     return error.ZeroLengthPayload;
@@ -274,7 +274,7 @@ test "test option parser" {
     const buf: []const u8 = &[_]u8{ 0x41, 0x01, 0x09, 0x26, 0x17, 0xd2, 0x0a, 0x0d, 0x25 };
     var req = try Request.init(buf);
 
-    const next_opt = try req.next_option();
+    const next_opt = try req.nextOption();
     const opt = next_opt.?;
     const val = opt.value;
 
