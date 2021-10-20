@@ -137,7 +137,7 @@ pub const Request = struct {
     }
 
     // https://datatracker.ietf.org/doc/html/rfc7252#section-3.1
-    fn decodeValue(self: *Request, val: u8) !u16 {
+    fn decodeValue(self: *Request, val: u4) !u16 {
         switch (val) {
             13 => {
                 // From RFC 7252:
@@ -194,8 +194,8 @@ pub const Request = struct {
             return null;
         }
 
-        const delta = try self.decodeValue(option >> 4);
-        const len = try self.decodeValue(option & 0xf);
+        const delta = try self.decodeValue(@intCast(u4, option >> 4));
+        const len = try self.decodeValue(@intCast(u4, option & 0xf));
 
         var optnum = self.last_option.?.number + delta;
         var optval = self.slice.bytes(len) catch {
