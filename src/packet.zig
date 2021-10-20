@@ -45,23 +45,23 @@ pub const Response = struct {
     last_option: u32 = 0,
 
     const DeltaEncoding = union(enum) {
-        zero: u4,
-        one: u8,
-        two: u16,
+        noExt: u4,
+        extByte: u8,
+        extHalf: u16,
 
         fn id(self: DeltaEncoding) u4 {
             switch (self) {
-                DeltaEncoding.zero => |x| return x,
-                DeltaEncoding.one  => return 13,
-                DeltaEncoding.two  => return 14,
+                DeltaEncoding.noExt => |x| return x,
+                DeltaEncoding.extByte => return 13,
+                DeltaEncoding.extHalf => return 14,
             }
         }
 
         fn writeExtend(self: DeltaEncoding, wb: *buffer.WriteBuffer) !void {
             switch (self) {
-                DeltaEncoding.zero => {},
-                DeltaEncoding.one  => |x| try wb.byte(x),
-                DeltaEncoding.two  => |x| try wb.half(std.mem.nativeToBig(u16, x)),
+                DeltaEncoding.noExt => {},
+                DeltaEncoding.extByte => |x| try wb.byte(x),
+                DeltaEncoding.extHalf => |x| try wb.half(std.mem.nativeToBig(u16, x)),
             }
         }
     };
@@ -78,7 +78,7 @@ pub const Response = struct {
         var r = Response{
             .header = hdr,
             .token = token,
-            .buffer = .{.slice = buf},
+            .buffer = .{ .slice = buf },
         };
 
         // Convert message ID to network byte order.
@@ -99,14 +99,14 @@ pub const Response = struct {
                 // From RFC 7252:
                 //
                 //   A value between 0 and 12 indicates the Option Delta.
-                return DeltaEncoding{ .zero = @intCast(u4, val) };
+                return DeltaEncoding{ .noExt = @intCast(u4, val) };
             },
             13...268 => { // 268 = 2^8 + 13 - 1
                 // From RFC 7252:
                 //
                 //   An 8-bit unsigned integer follows the initial byte and
                 //   indicates the Option Delta minus 13.
-                return DeltaEncoding{ .one = @intCast(u8, (val - 13)) };
+                return DeltaEncoding{ .extByte = @intCast(u8, (val - 13)) };
             },
             269...65804 => { // 65804 = 2^16 + 269 - 1
                 // From RFC 7252:
@@ -114,7 +114,7 @@ pub const Response = struct {
                 //   A 16-bit unsigned integer in network byte order follows the
                 //   initial byte and indicates the Option Delta minus 269.
                 const v = std.mem.nativeToBig(u16, @intCast(u16, val - 269));
-                return DeltaEncoding{ .two = v };
+                return DeltaEncoding{ .extHalf = v };
             },
             else => unreachable,
         }
@@ -147,8 +147,7 @@ test "test header serialization" {
     const exp: []const u8 = &[_]u8{ 0x41, 0x01, 0x09, 0x26 };
 
     var buf = [_]u8{0} ** exp.len;
-    var resp = try Response.init(&buf, Mtype.confirmable,
-                                 codes.GET, &[_]u8{ 23 }, 2342);
+    var resp = try Response.init(&buf, Mtype.confirmable, codes.GET, &[_]u8{23}, 2342);
 
     const serialized = resp.marshal();
     testing.expect(std.mem.eql(u8, serialized, exp));
@@ -158,10 +157,9 @@ test "test option serialization" {
     const exp: []const u8 = &[_]u8{ 0x40, 0x01, 0x09, 0x26, 0xd2, 0x0a, 0x0d, 0x25 };
 
     var buf = [_]u8{0} ** exp.len;
-    var resp = try Response.init(&buf, Mtype.confirmable,
-                                 codes.GET, &[_]u8{}, 2342);
+    var resp = try Response.init(&buf, Mtype.confirmable, codes.GET, &[_]u8{}, 2342);
 
-    const opt = options.Option{ .number = 23, .value = &[_]u8{13, 37} };
+    const opt = options.Option{ .number = 23, .value = &[_]u8{ 13, 37 } };
     try resp.addOption(&opt);
 
     const serialized = resp.marshal();
