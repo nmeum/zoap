@@ -4,6 +4,10 @@ pub const WriteBuffer = struct {
     slice: []u8,
     pos: usize = 0,
 
+    pub fn serialized(self: *WriteBuffer) []u8 {
+        return self.slice[0..self.pos];
+    }
+
     pub fn bytes(self: *WriteBuffer, buf: []const u8) !void {
         if (self.slice.len - self.pos < buf.len)
             return error.OutOfBounds;

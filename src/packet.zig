@@ -142,7 +142,7 @@ pub const Response = struct {
     }
 
     pub fn marshal(self: *Response) []u8 {
-        return self.buffer.slice;
+        return self.buffer.serialized();
     }
 };
 
