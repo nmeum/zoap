@@ -157,14 +157,20 @@ test "test header serialization" {
 }
 
 test "test option serialization" {
-    const exp: []const u8 = &[_]u8{ 0x40, 0x01, 0x09, 0x26, 0xd2, 0x0a, 0x0d, 0x25, 0xe0, 0xfe, 0xdb };
+    const exp: []const u8 = &[_]u8{ 0x40, 0x01, 0x09, 0x26, 0x21, 0xff, 0xd2, 0x08, 0x0d, 0x25, 0xe0, 0xfe, 0xdb };
 
     var buf = [_]u8{0} ** exp.len;
     var resp = try Response.init(&buf, Mtype.confirmable, codes.GET, &[_]u8{}, 2342);
 
+    // Zero byte extension
+    const opt0 = options.Option{ .number = 2, .value = &[_]u8{0xff} };
+    try resp.addOption(&opt0);
+
+    // One byte extension
     const opt1 = options.Option{ .number = 23, .value = &[_]u8{ 13, 37 } };
     try resp.addOption(&opt1);
 
+    // Two byte extension
     const opt2 = options.Option{ .number = 65535, .value = &[_]u8{} };
     try resp.addOption(&opt2);
 
