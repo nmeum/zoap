@@ -120,6 +120,8 @@ pub const Response = struct {
         }
     }
 
+    // TODO: Reset buffer on error (or check that enough space for
+    // option is available in advance).
     pub fn addOption(self: *Response, opt: *const options.Option) !void {
         if (opt.number < self.last_option)
             unreachable;
