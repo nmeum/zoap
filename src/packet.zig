@@ -157,13 +157,16 @@ test "test header serialization" {
 }
 
 test "test option serialization" {
-    const exp: []const u8 = &[_]u8{ 0x40, 0x01, 0x09, 0x26, 0xd2, 0x0a, 0x0d, 0x25 };
+    const exp: []const u8 = &[_]u8{ 0x40, 0x01, 0x09, 0x26, 0xd2, 0x0a, 0x0d, 0x25, 0xe0, 0xfe, 0xdb };
 
     var buf = [_]u8{0} ** exp.len;
     var resp = try Response.init(&buf, Mtype.confirmable, codes.GET, &[_]u8{}, 2342);
 
-    const opt = options.Option{ .number = 23, .value = &[_]u8{ 13, 37 } };
-    try resp.addOption(&opt);
+    const opt1 = options.Option{ .number = 23, .value = &[_]u8{ 13, 37 } };
+    try resp.addOption(&opt1);
+
+    const opt2 = options.Option{ .number = 65535, .value = &[_]u8{} };
+    try resp.addOption(&opt2);
 
     const serialized = resp.marshal();
     testing.expect(std.mem.eql(u8, serialized, exp));
