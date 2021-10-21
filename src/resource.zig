@@ -3,7 +3,7 @@ const pkt = @import("packet.zig");
 const opt = @import("options.zig");
 
 // TODO: Allow returning an error
-pub const ResourceHandler = fn (packet: *pkt.Packet) void;
+pub const ResourceHandler = fn (req: *pkt.Request) void;
 
 pub const Resource = struct {
     path: []const u8,
@@ -17,15 +17,15 @@ pub const Resource = struct {
 pub const Dispatcher = struct {
     resources: []const Resource,
 
-    pub fn dispatch(self: Dispatcher, packet: *pkt.Packet) !bool {
-        const path_opt = try packet.findOption(opt.URIPath);
+    pub fn dispatch(self: Dispatcher, req: *pkt.Request) !bool {
+        const path_opt = try req.findOption(opt.URIPath);
         const path = path_opt.value;
 
         for (self.resources) |res, _| {
             if (!res.matchPath(path))
                 continue;
 
-            res.handler(packet);
+            res.handler(req);
             return true;
         }
 
