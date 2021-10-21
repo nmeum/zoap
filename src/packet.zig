@@ -123,7 +123,7 @@ pub const Response = struct {
     // TODO: Reset buffer on error (or check that enough space for
     // option is available in advance).
     pub fn addOption(self: *Response, opt: *const options.Option) !void {
-        if (opt.number < self.last_option)
+        if (self.last_option > opt.number)
             unreachable;
         const delta = opt.number - self.last_option;
 
@@ -138,6 +138,7 @@ pub const Response = struct {
         try olen.writeExtend(&self.buffer);
 
         try self.buffer.bytes(opt.value);
+        self.last_option = opt.number;
     }
 
     pub fn marshal(self: *Response) []u8 {
