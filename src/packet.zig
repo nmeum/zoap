@@ -61,7 +61,7 @@ pub const Response = struct {
             switch (self) {
                 DeltaEncoding.noExt => {},
                 DeltaEncoding.extByte => |x| try wb.byte(x),
-                DeltaEncoding.extHalf => |x| try wb.half(std.mem.nativeToBig(u16, x)),
+                DeltaEncoding.extHalf => |x| try wb.half(x),
             }
         }
     };
