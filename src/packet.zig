@@ -49,6 +49,33 @@ pub const Response = struct {
         extByte: u8,
         extHalf: u16,
 
+        fn encode(val: u32) DeltaEncoding {
+            switch (val) {
+                0...12 => {
+                    // From RFC 7252:
+                    //
+                    //   A value between 0 and 12 indicates the Option Delta.
+                    return DeltaEncoding{ .noExt = @intCast(u4, val) };
+                },
+                13...268 => { // 268 = 2^8 + 13 - 1
+                    // From RFC 7252:
+                    //
+                    //   An 8-bit unsigned integer follows the initial byte and
+                    //   indicates the Option Delta minus 13.
+                    return DeltaEncoding{ .extByte = @intCast(u8, (val - 13)) };
+                },
+                269...65804 => { // 65804 = 2^16 + 269 - 1
+                    // From RFC 7252:
+                    //
+                    //   A 16-bit unsigned integer in network byte order follows the
+                    //   initial byte and indicates the Option Delta minus 269.
+                    const v = std.mem.nativeToBig(u16, @intCast(u16, val - 269));
+                    return DeltaEncoding{ .extHalf = v };
+                },
+                else => unreachable,
+            }
+        }
+
         fn id(self: DeltaEncoding) u4 {
             switch (self) {
                 DeltaEncoding.noExt => |x| return x,
@@ -93,33 +120,6 @@ pub const Response = struct {
         return r;
     }
 
-    pub fn encodeValue(self: *Response, val: u32) DeltaEncoding {
-        switch (val) {
-            0...12 => {
-                // From RFC 7252:
-                //
-                //   A value between 0 and 12 indicates the Option Delta.
-                return DeltaEncoding{ .noExt = @intCast(u4, val) };
-            },
-            13...268 => { // 268 = 2^8 + 13 - 1
-                // From RFC 7252:
-                //
-                //   An 8-bit unsigned integer follows the initial byte and
-                //   indicates the Option Delta minus 13.
-                return DeltaEncoding{ .extByte = @intCast(u8, (val - 13)) };
-            },
-            269...65804 => { // 65804 = 2^16 + 269 - 1
-                // From RFC 7252:
-                //
-                //   A 16-bit unsigned integer in network byte order follows the
-                //   initial byte and indicates the Option Delta minus 269.
-                const v = std.mem.nativeToBig(u16, @intCast(u16, val - 269));
-                return DeltaEncoding{ .extHalf = v };
-            },
-            else => unreachable,
-        }
-    }
-
     // TODO: Reset buffer on error (or check that enough space for
     // option is available in advance).
     pub fn addOption(self: *Response, opt: *const options.Option) !void {
@@ -127,8 +127,8 @@ pub const Response = struct {
             unreachable;
         const delta = opt.number - self.last_option;
 
-        const odelta = self.encodeValue(delta);
-        const olen = self.encodeValue(@intCast(u32, opt.value.len));
+        const odelta = DeltaEncoding.encode(delta);
+        const olen = DeltaEncoding.encode(@intCast(u32, opt.value.len));
 
         // Write first byte of CoAP option format.
         try self.buffer.byte(@as(u8, odelta.id()) << 4 | olen.id());
