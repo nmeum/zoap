@@ -1,5 +1,5 @@
 const std = @import("std");
-const testing = std.testing;
+const expect = std.testing.expect;
 const buffer = @import("buffer.zig");
 
 const codes = @import("code.zig");
@@ -153,7 +153,7 @@ test "test header serialization" {
     var resp = try Response.init(&buf, Mtype.confirmable, codes.GET, &[_]u8{23}, 2342);
 
     const serialized = resp.marshal();
-    testing.expect(std.mem.eql(u8, serialized, exp));
+    try expect(std.mem.eql(u8, serialized, exp));
 }
 
 test "test option serialization" {
@@ -175,7 +175,7 @@ test "test option serialization" {
     try resp.addOption(&opt2);
 
     const serialized = resp.marshal();
-    testing.expect(std.mem.eql(u8, serialized, exp));
+    try expect(std.mem.eql(u8, serialized, exp));
 }
 
 pub const Request = struct {
@@ -346,12 +346,12 @@ test "test header parser" {
     const req = try Request.init(buf);
     const hdr = req.header;
 
-    testing.expect(hdr.version == VERSION);
-    testing.expect(hdr.type == Mtype.confirmable);
-    testing.expect(hdr.token_len == 1);
-    testing.expect(req.token[0] == 23);
-    testing.expect(hdr.code.equal(codes.GET));
-    testing.expect(hdr.message_id == 2342);
+    try expect(hdr.version == VERSION);
+    try expect(hdr.type == Mtype.confirmable);
+    try expect(hdr.token_len == 1);
+    try expect(req.token[0] == 23);
+    try expect(hdr.code.equal(codes.GET));
+    try expect(hdr.message_id == 2342);
 }
 
 test "test payload parsing" {
@@ -359,7 +359,7 @@ test "test payload parsing" {
     var req = try Request.init(buf);
 
     try req.skipOptions();
-    testing.expect(req.payload.? == &buf[7]);
+    try expect(req.payload.? == &buf[7]);
 }
 
 test "test option parser" {
@@ -370,10 +370,10 @@ test "test option parser" {
     const opt = next_opt.?;
     const val = opt.value;
 
-    testing.expect(opt.number == 23);
-    testing.expect(val.len == 2);
-    testing.expect(val[0] == 13);
-    testing.expect(val[1] == 37);
+    try expect(opt.number == 23);
+    try expect(val.len == 2);
+    try expect(val[0] == 13);
+    try expect(val[1] == 37);
 }
 
 test "test findOption" {
@@ -382,19 +382,19 @@ test "test findOption" {
 
     // First option
     const opt1 = try req.findOption(23);
-    testing.expect(opt1.number == 23);
+    try expect(opt1.number == 23);
     const exp1: []const u8 = &[_]u8{ 1, 2, 3, 4 };
-    testing.expect(std.mem.eql(u8, exp1, opt1.value));
+    try expect(std.mem.eql(u8, exp1, opt1.value));
 
     // Third option, skipping second
     const opt3 = try req.findOption(50);
-    testing.expect(opt3.number == 50);
+    try expect(opt3.number == 50);
     const exp3: []const u8 = &[_]u8{1};
-    testing.expect(std.mem.eql(u8, exp3, opt3.value));
+    try expect(std.mem.eql(u8, exp3, opt3.value));
 
     // Attempting to access the second option should result in usage error
-    testing.expectError(error.InvalidArgument, req.findOption(23));
+    try std.testing.expectError(error.InvalidArgument, req.findOption(23));
 
     // Skipping options and accessing payload should work.
-    testing.expectError(error.ZeroLengthPayload, req.skipOptions());
+    try std.testing.expectError(error.ZeroLengthPayload, req.skipOptions());
 }

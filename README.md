@@ -8,7 +8,7 @@ This is just intended a small experiment with the
 [Zig programming language][zig web]. The goal isn't creating a complete
 standard-compliant implementation of CoAP in Zig. However, this toy
 implementation is used presently in [zig-riscv-embedded][zig-riscv github].
-This code is known to compile with Zig `0.7.1+e4213c4b08`.
+This code is known to compile with Zig `0.8.1`.
 
 ## Installation
 
