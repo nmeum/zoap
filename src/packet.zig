@@ -181,7 +181,7 @@ test "test option serialization" {
 pub const Request = struct {
     header: Header,
     slice: buffer.ReadBuffer,
-    token: ?[]const u8,
+    token: []const u8,
     payload: ?*const u8,
     last_option: ?options.Option,
 
@@ -205,7 +205,7 @@ pub const Request = struct {
         // via packed structs in Zig 0.7.1 (probably compiler bug).
         hdr.token_len = @intCast(u4, firstByte & 0xf);
 
-        var token: ?[]const u8 = null;
+        var token: []const u8 = &[_]u8{};
         if (hdr.token_len > 0) {
             if (hdr.token_len > MAX_TOKEN_LEN)
                 return error.FormatError;
@@ -349,7 +349,7 @@ test "test header parser" {
     testing.expect(hdr.version == VERSION);
     testing.expect(hdr.type == Mtype.confirmable);
     testing.expect(hdr.token_len == 1);
-    testing.expect(req.token.?[0] == 23);
+    testing.expect(req.token[0] == 23);
     testing.expect(hdr.code.equal(codes.GET));
     testing.expect(hdr.message_id == 2342);
 }
