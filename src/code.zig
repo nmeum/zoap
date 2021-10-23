@@ -14,3 +14,10 @@ pub const GET = Code{ .class = 0, .detail = 01 };
 pub const POST = Code{ .class = 0, .detail = 02 };
 pub const PUT = Code{ .class = 0, .detail = 03 };
 pub const DELETE = Code{ .class = 0, .detail = 04 };
+
+// Responses
+pub const CREATED = Code{ .class = 2, .detail = 01 };
+pub const BAD_REQ = Code{ .class = 4, .detail = 00 };
+pub const NOT_FOUND = Code{ .class = 4, .detail = 04 };
+pub const NOT_IMPL = Code{ .class = 5, .detail = 01 };
+pub const INTERNAL_ERR = Code{ .class = 5, .detail = 00 };
