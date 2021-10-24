@@ -31,9 +31,9 @@ pub const Mtype = enum(u2) {
 };
 
 pub const Header = packed struct {
-    version: u2,
-    type: Mtype,
     token_len: u4,
+    type: Mtype,
+    version: u2,
     code: codes.Code,
     message_id: u16,
 };
@@ -114,9 +114,6 @@ pub const Response = struct {
         const serialized = @bitCast(u32, hdr);
         try r.buffer.word(serialized);
 
-        // Serialization of token_len is broken due to compiler bug.
-        r.buffer.slice[0] = (0x1 << 6) | (@intCast(u8, @enumToInt(mtype)) << 4) | @intCast(u4, token.len);
-
         return r;
     }
 
@@ -194,16 +191,11 @@ pub const Request = struct {
             return error.FormatError;
 
         // Cast first four bytes to u32 and convert them to header struct
-        const firstByte = slice.slice[0]; // XXX (see below)
         const serialized: u32 = try slice.word();
         var hdr = @bitCast(Header, serialized);
 
         // Convert message_id to a integer in host byteorder
         hdr.message_id = std.mem.bigToNative(u16, hdr.message_id);
-
-        // TODO: Somehow extraction of the token length does not work
-        // via packed structs in Zig 0.7.1 (probably compiler bug).
-        hdr.token_len = @intCast(u4, firstByte & 0xf);
 
         var token: []const u8 = &[_]u8{};
         if (hdr.token_len > 0) {
