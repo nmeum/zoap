@@ -21,7 +21,7 @@ pub const Dispatcher = struct {
         const path_opt = try req.findOption(opt.URIPath);
         const path = path_opt.value;
 
-        for (self.resources) |res, _| {
+        for (self.resources) |res| {
             if (!res.matchPath(path))
                 continue;
 
