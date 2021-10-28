@@ -117,6 +117,11 @@ pub const Response = struct {
         return r;
     }
 
+    pub fn reply(buf: []u8, req: *const Request, mtype: Mtype, code: codes.Code) !Response {
+        const hdr = req.header;
+        return init(buf, mtype, code, req.token, hdr.message_id);
+    }
+
     // TODO: Reset buffer on error (or check that enough space for
     // option is available in advance).
     pub fn addOption(self: *Response, opt: *const options.Option) !void {
