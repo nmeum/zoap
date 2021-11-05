@@ -13,7 +13,7 @@ const options = @import("options.zig");
 //  number. Implementations of this specification MUST set this field
 //  to 1 (01 binary).
 //
-pub const VERSION: u2 = 1;
+const VERSION: u2 = 1;
 
 // Maximum length of a CoAP token.
 //
