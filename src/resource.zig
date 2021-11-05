@@ -3,7 +3,7 @@ const pkt = @import("packet.zig");
 const opt = @import("options.zig");
 const codes = @import("code.zig");
 
-// TODO: Allow returning an error
+// TODO: Pass response writer.
 pub const ResourceHandler = fn (req: *pkt.Request) void;
 
 // Size for reply buffer

@@ -108,6 +108,8 @@ pub const Response = struct {
     buffer: buffer.WriteBuffer,
     last_option: u32 = 0,
 
+    // TODO: Allow setting payload via io.Writer
+
     pub fn init(buf: []u8, mtype: Mtype, code: codes.Code, token: []const u8, id: u16) !Response {
         if (buf.len < @sizeOf(Header) + token.len)
             return error.OutOfBounds;
@@ -307,7 +309,7 @@ pub const Request = struct {
         }
     }
 
-    // TODO: comptime to enforce order of functions calls (e.g. no nextOption after skipOptions)
+    // TODO: asserts for function call order (e.g. no nextOption after skipOptions)
     fn nextOption(self: *Request) !?options.Option {
         if (self.last_option == null)
             return null;
