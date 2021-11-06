@@ -3,7 +3,7 @@ const testing = std.testing;
 
 const buffer = @import("buffer.zig");
 const codes = @import("codes.zig");
-const options = @import("options.zig");
+const opts = @import("opts.zig");
 
 // CoAP version implemented by this library.
 //
@@ -169,7 +169,7 @@ pub const Response = struct {
     /// in order of their Option Numbers. After data has been written to
     /// the payload, no additional options can be added. Both invariants
     /// are enforced using assertions in Debug and ReleaseSafe modes.
-    pub fn addOption(self: *Response, opt: *const options.Option) !void {
+    pub fn addOption(self: *Response, opt: *const opts.Option) !void {
         // This function cannot be called after payload has been written.
         std.debug.assert(self.zero_payload);
 
@@ -274,19 +274,19 @@ test "test option serialization" {
     var resp = try Response.init(&buf, Msg.con, codes.GET, &[_]u8{}, 2342);
 
     // Zero byte extension
-    const opt0 = options.Option{ .number = 2, .value = &[_]u8{0xff} };
+    const opt0 = opts.Option{ .number = 2, .value = &[_]u8{0xff} };
     try resp.addOption(&opt0);
 
     // One byte extension
-    const opt1 = options.Option{ .number = 23, .value = &[_]u8{ 13, 37 } };
+    const opt1 = opts.Option{ .number = 23, .value = &[_]u8{ 13, 37 } };
     try resp.addOption(&opt1);
 
     // Two byte extension
-    const opt2 = options.Option{ .number = 65535, .value = &[_]u8{} };
+    const opt2 = opts.Option{ .number = 65535, .value = &[_]u8{} };
     try resp.addOption(&opt2);
 
     // Two byte extension (not enough space in buffer)
-    const opt_err = options.Option{ .number = 65535, .value = &[_]u8{} };
+    const opt_err = opts.Option{ .number = 65535, .value = &[_]u8{} };
     try testing.expectError(error.BufTooSmall, resp.addOption(&opt_err));
 
     const serialized = resp.marshal();
@@ -298,7 +298,7 @@ pub const Request = struct {
     slice: buffer.ReadBuffer,
     token: []const u8,
     payload: ?*const u8,
-    last_option: ?options.Option,
+    last_option: ?opts.Option,
 
     pub fn init(buf: []const u8) !Request {
         var slice = buffer.ReadBuffer{ .slice = buf };
@@ -324,7 +324,7 @@ pub const Request = struct {
 
         // For the first instance in a message, a preceding
         // option instance with Option Number zero is assumed.
-        const init_option = options.Option{ .number = 0, .value = &[_]u8{} };
+        const init_option = opts.Option{ .number = 0, .value = &[_]u8{} };
 
         return Request{
             .header = hdr,
@@ -376,7 +376,7 @@ pub const Request = struct {
 
     /// Returns the next option or null if all options have already been
     /// parsed. Options are returned in the order of their Option Numbers.
-    fn nextOption(self: *Request) !?options.Option {
+    fn nextOption(self: *Request) !?opts.Option {
         if (self.last_option == null)
             return null;
 
@@ -402,7 +402,7 @@ pub const Request = struct {
             return error.FormatError;
         };
 
-        const ret = options.Option{
+        const ret = opts.Option{
             .number = optnum,
             .value = optval,
         };
@@ -418,7 +418,7 @@ pub const Request = struct {
     /// a smaller Option Number then the given one. Similarly, when
     /// attempting to find multiple options, this function must be
     /// called in order of their Option Numbers.
-    pub fn findOption(self: *Request, optnum: u32) !options.Option {
+    pub fn findOption(self: *Request, optnum: u32) !opts.Option {
         if (optnum == 0)
             return error.InvalidArgument;
         if (self.last_option == null)

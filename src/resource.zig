@@ -1,6 +1,6 @@
 const std = @import("std");
 const pkt = @import("packet.zig");
-const opt = @import("options.zig");
+const opts = @import("opts.zig");
 const codes = @import("codes.zig");
 
 // TODO: Pass response writer.
@@ -34,7 +34,7 @@ pub const Dispatcher = struct {
             return self.reply(req, pkt.Msg.rst, codes.NOT_IMPL);
         }
 
-        const path_opt = try req.findOption(opt.URIPath);
+        const path_opt = try req.findOption(opts.URIPath);
         const path = path_opt.value;
 
         for (self.resources) |res| {

@@ -10,4 +10,4 @@ pub const Resource = res.Resource;
 pub const Dispatcher = res.Dispatcher;
 
 pub const codes = @import("codes.zig");
-pub const options = @import("options.zig");
+pub const opts = @import("opts.zig");
