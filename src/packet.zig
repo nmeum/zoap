@@ -213,6 +213,12 @@ pub const Response = struct {
         return data.len; // Don't return len to not confuse caller.
     }
 
+    /// Update CoAP response code after creating the packet.
+    pub fn setCode(self: *Response, code: codes.Code) void {
+        // Code is *always* the second byte in the buffer.
+        self.buffer.slice[1] = @bitCast(u8, code);
+    }
+
     pub fn payloadWriter(self: *Response) PayloadWriter {
         return PayloadWriter{ .context = self };
     }
@@ -227,6 +233,19 @@ test "test header serialization" {
 
     var buf = [_]u8{0} ** exp.len;
     var resp = try Response.init(&buf, Msg.con, codes.GET, &[_]u8{}, 2342);
+
+    const serialized = resp.marshal();
+    try testing.expect(std.mem.eql(u8, serialized, exp));
+}
+
+test "test setCode after package creation" {
+    const exp = @embedFile("../testvectors/basic-header.bin");
+
+    var buf = [_]u8{0} ** exp.len;
+    var resp = try Response.init(&buf, Msg.con, codes.DELETE, &[_]u8{}, 2342);
+
+    // Change code from DELETE to GET. The latter is expected.
+    resp.setCode(codes.GET);
 
     const serialized = resp.marshal();
     try testing.expect(std.mem.eql(u8, serialized, exp));

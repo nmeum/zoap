@@ -3,8 +3,7 @@ const pkt = @import("packet.zig");
 const opts = @import("opts.zig");
 const codes = @import("codes.zig");
 
-// TODO: Pass response writer.
-pub const ResourceHandler = fn (req: *pkt.Request) void;
+pub const ResourceHandler = fn (resp: *pkt.Response, req: *pkt.Request) codes.Code;
 
 // Size for reply buffer
 const REPLY_BUFSIZ = 256;
@@ -41,8 +40,10 @@ pub const Dispatcher = struct {
             if (!res.matchPath(path))
                 continue;
 
-            res.handler(req);
-            return self.reply(req, pkt.Msg.non, codes.CREATED);
+            var resp = try self.reply(req, pkt.Msg.non, .{ .class = 0, .detail = 0 });
+            resp.setCode(res.handler(&resp, req));
+
+            return resp;
         }
 
         return self.reply(req, pkt.Msg.non, codes.NOT_FOUND);
