@@ -126,8 +126,10 @@ pub const Response = struct {
     token: []const u8,
     buffer: buffer.WriteBuffer,
     last_option: u32 = 0,
+    zero_payload: bool = true,
 
-    // TODO: Allow setting payload via io.Writer
+    const WriteError = error{BufTooSmall};
+    const PayloadWriter = std.io.Writer(*Response, WriteError, write);
 
     pub fn init(buf: []u8, mtype: Mtype, code: codes.Code, token: []const u8, id: u16) !Response {
         if (buf.len < @sizeOf(Header) + token.len)
@@ -183,6 +185,31 @@ pub const Response = struct {
         self.last_option = opt.number;
     }
 
+    /// Write data to the payload of the CoAP response. If the given data
+    /// exceeds the available space in the buffer, an error is returned.
+    fn write(self: *Response, data: []const u8) WriteError!usize {
+        var len = data.len;
+        if (self.zero_payload)
+            len += 1;
+
+        // This function is part of the public API, thus safety-checked
+        // undefined behavior is not good enough and we add a bounds check.
+        if (self.buffer.capacity() < len)
+            return WriteError.BufTooSmall;
+
+        if (self.zero_payload) {
+            self.buffer.byte(OPTION_END);
+            self.zero_payload = false;
+        }
+
+        self.buffer.bytes(data);
+        return data.len; // Don't return len to not confuse caller.
+    }
+
+    pub fn payloadWriter(self: *Response) PayloadWriter {
+        return PayloadWriter{ .context = self };
+    }
+
     pub fn marshal(self: *Response) []u8 {
         return self.buffer.serialized();
     }
@@ -218,6 +245,19 @@ test "test header serialization with insufficient buffer space" {
 
     // Ensure that Response.init has no side effects.
     try expect(std.mem.eql(u8, &buf, exp));
+}
+
+test "test payload serialization" {
+    const exp: []const u8 = &[_]u8{ 0x70, 0x04, 0x00, 0x01, 0xff, 0x48, 0x65, 0x6c, 0x6c, 0x6f };
+
+    var buf = [_]u8{0} ** exp.len;
+    var resp = try Response.init(&buf, Mtype.reset, codes.DELETE, &[_]u8{}, 1);
+
+    var w = resp.payloadWriter();
+    try w.print("Hello", .{});
+
+    const serialized = resp.marshal();
+    try expect(std.mem.eql(u8, serialized, exp));
 }
 
 test "test option serialization" {
