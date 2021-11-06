@@ -15,6 +15,25 @@ const options = @import("options.zig");
 //
 pub const VERSION: u2 = 1;
 
+// Maximum length of a CoAP token.
+//
+// From RFC 7252:
+//
+//  Lengths 9-15 are reserved, MUST NOT be sent, and MUST be processed
+//  as a message format error.
+//
+const MAX_TOKEN_LEN = 8;
+
+// CoAP Payload marker.
+//
+// From RFC 7252:
+//
+//  If present and of non-zero length, it is prefixed by a fixed,
+//  one-byte Payload Marker (0xFF), which indicates the end of options
+//  and the start of the payload.
+//
+const OPTION_END = 0xff;
+
 // CoAP message type.
 //
 // From RFC 7252:
@@ -231,9 +250,6 @@ pub const Request = struct {
     token: []const u8,
     payload: ?*const u8,
     last_option: ?options.Option,
-
-    const MAX_TOKEN_LEN = 8;
-    const OPTION_END = 0xff;
 
     pub fn init(buf: []const u8) !Request {
         var slice = buffer.ReadBuffer{ .slice = buf };
