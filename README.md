@@ -1,18 +1,40 @@
 # zoap
 
-A toy parser for the [CoAP][coap rfc] message format.
+A WiP [CoAP][rfc 7252] implementation for bare-metal [constrained devices][rfc 7228].
 
 ## Status
 
-This is just intended a small experiment with the
-[Zig programming language][zig web]. The goal isn't creating a complete
-standard-compliant implementation of CoAP in Zig. However, this toy
-implementation is used presently in [zig-riscv-embedded][zig-riscv github].
-This code is known to compile with Zig `0.8.1`.
+Presently, the majority of the CoAP standard is not implemented.
+However, creating a very basic CoAP server which sends and receives
+non-confirmable messages is possible and already done as part of my
+[zig-riscv-embedded][zig-riscv github] project. Since the code focus
+on constrained bare-metal targets, it is optimized for a small memory
+footprint and uses statically allocated fixed-size buffers instead of
+performing dynamic memory allocation. Furthermore, it does not use any
+OS-specific code from the Zig standard library (e.g. Sockets).
+
+The code is known to compile with Zig `0.8.1`.
 
 ## Installation
 
-See [How do I use packages?](https://github.com/ziglang/zig/wiki/FAQ#how-do-i-use-packages).
+Zig packages are simply Zig source trees and are imported using
+[`@import`][zig import] just like code from the Zig standard library.
+Therefore, the zoap source tree must be added to the Zig codebase using
+it. This can, for example, be achieved using [git submodules][git submodules]
+or a third-party package manager like [gyro][gyro github].
+
+For the former method, the package source tree needs to be explicitly
+added to `build.rs`. Assuming, the submodule was added as `./zoap` in
+the directory root the following code should be sufficient:
+
+```Zig
+exe.addPackage(std.build.Pkg{
+    .name = "zoap",
+    .path = "./zoap/src/zoap.zig",
+});
+```
+
+Afterwards, simply import zoap using `const zoap = @import("zoap");`.
 
 ## Usage
 
@@ -20,7 +42,7 @@ See [zig-riscv-embedded][zig-riscv github] for a usage example.
 
 ## Test vectors
 
-For parsing code, test vectors are generated using the existing
+For parsing code, test vectors are created using the existing
 [go-coap][go-coap github] implementation written in [Go][go website].
 Test vectors are generated using `./testvectors/generate.go` and
 available as `./testvectors/*.bin` files. These files are tracked in the
@@ -33,12 +55,12 @@ All existing Zig parser test cases can be run using:
 	$ zig test src/packet.zig
 
 New test cases can be added by modifying `./testvectors/generate.go` and
-`./src/packet.zig`. Afterwards, the test case file needs to be generated
-using:
+`./src/packet.zig`. Afterwards, the test case files need to be
+regenerated using:
 
 	$ cd ./testvectors && go build -trimpath && ./testvectors
 
-New test vectors need to be committed to the Git repository.
+New test vectors must be committed to the Git repository.
 
 ## License
 
@@ -55,9 +77,13 @@ Public License for more details.
 You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>.
 
-[coap rfc]: https://datatracker.ietf.org/doc/rfc7252/
+[rfc 7252]: https://datatracker.ietf.org/doc/rfc7252/
+[rfc 7228]: https://datatracker.ietf.org/doc/rfc7228/
 [zig web]: https://ziglang.org/
 [zig-riscv github]: https://github.com/nmeum/zig-riscv-embedded
 [go-coap github]: https://github.com/plgd-dev/go-coap
 [go website]: https://golang.org
 [zig embedFile]: https://ziglang.org/documentation/0.8.1/#embedFile
+[zig import]: https://ziglang.org/documentation/0.8.1/#import
+[git submodules]: https://git-scm.com/book/en/v2/Git-Tools-Submodules
+[gyro github]: https://github.com/mattnite/gyro
