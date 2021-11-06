@@ -141,8 +141,7 @@ pub const Response = struct {
     }
 
     pub fn addOption(self: *Response, opt: *const options.Option) !void {
-        if (self.last_option > opt.number)
-            unreachable; // could also use std.debug.assert
+        std.debug.assert(self.last_option <= opt.number);
         const delta = opt.number - self.last_option;
 
         const odelta = DeltaEncoding.encode(delta);
