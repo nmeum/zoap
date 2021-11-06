@@ -1,5 +1,9 @@
 const mem = @import("std").mem;
 
+/// WriteBuffer adds support allows writing bytes to an underlying buffer
+/// with safety-checked undefined behaviour. That is, the caller should
+/// check in advance whether sufficient space is available via
+/// WriteBuffer.capacity().
 pub const WriteBuffer = struct {
     slice: []u8,
     pos: usize = 0,
@@ -8,28 +12,35 @@ pub const WriteBuffer = struct {
         return self.slice[0..self.pos];
     }
 
-    pub fn bytes(self: *WriteBuffer, buf: []const u8) !void {
-        if (self.slice.len - self.pos < buf.len)
-            return error.OutOfBounds;
+    pub fn capacity(self: *WriteBuffer) usize {
+        return self.slice.len - self.pos;
+    }
+
+    pub fn bytes(self: *WriteBuffer, buf: []const u8) void {
+        // mem.copy does not provide safety-checked undefined
+        // behaviour. Thus, it is added explicitly here via
+        // unreachable.
+        if (self.capacity() < buf.len)
+            unreachable; // could also use std.debug.assert
 
         mem.copy(u8, self.slice[self.pos..], buf);
         self.pos += buf.len;
     }
 
-    fn write(self: *WriteBuffer, ptr: anytype) !void {
-        try self.bytes(mem.asBytes(ptr));
+    fn write(self: *WriteBuffer, ptr: anytype) void {
+        self.bytes(mem.asBytes(ptr));
     }
 
-    pub fn byte(self: *WriteBuffer, b: u8) !void {
-        try self.write(&b);
+    pub fn byte(self: *WriteBuffer, b: u8) void {
+        self.write(&b);
     }
 
-    pub fn half(self: *WriteBuffer, h: u16) !void {
-        try self.write(&h);
+    pub fn half(self: *WriteBuffer, h: u16) void {
+        self.write(&h);
     }
 
-    pub fn word(self: *WriteBuffer, w: u32) !void {
-        try self.write(&w);
+    pub fn word(self: *WriteBuffer, w: u32) void {
+        self.write(&w);
     }
 };
 

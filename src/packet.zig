@@ -84,16 +84,30 @@ pub const Response = struct {
             }
         }
 
-        fn writeExtend(self: DeltaEncoding, wb: *buffer.WriteBuffer) !void {
+        /// Amount of additionall extension bytes (0 - 2 bytes)
+        /// required to store this value (not including the initial ID
+        /// byte in the option format).
+        fn size(self: DeltaEncoding) usize {
+            return switch (self) {
+                DeltaEncoding.noExt => 0,
+                DeltaEncoding.extByte => 1,
+                DeltaEncoding.extHalf => 2,
+            };
+        }
+
+        fn writeExtend(self: DeltaEncoding, wb: *buffer.WriteBuffer) void {
             switch (self) {
                 DeltaEncoding.noExt => {},
-                DeltaEncoding.extByte => |x| try wb.byte(x),
-                DeltaEncoding.extHalf => |x| try wb.half(x),
+                DeltaEncoding.extByte => |x| wb.byte(x),
+                DeltaEncoding.extHalf => |x| wb.half(x),
             }
         }
     };
 
     pub fn init(buf: []u8, mtype: Mtype, code: codes.Code, token: []const u8, id: u16) !Response {
+        if (buf.len < @sizeOf(Header) + token.len)
+            return error.OutOfBounds;
+
         var hdr = Header{
             .version = VERSION,
             .type = mtype,
@@ -111,9 +125,8 @@ pub const Response = struct {
         hdr.message_id = std.mem.nativeToBig(u16, hdr.message_id);
         const serialized = @bitCast(u32, hdr);
 
-        // TODO: Reset buffer on error or check space in advance.
-        try r.buffer.word(serialized);
-        try r.buffer.bytes(token);
+        r.buffer.word(serialized);
+        r.buffer.bytes(token);
 
         return r;
     }
@@ -123,24 +136,24 @@ pub const Response = struct {
         return init(buf, mtype, code, req.token, hdr.message_id);
     }
 
-    // TODO: Reset buffer on error (or check that enough space for
-    // option is available in advance).
     pub fn addOption(self: *Response, opt: *const options.Option) !void {
         if (self.last_option > opt.number)
-            unreachable;
+            unreachable; // could also use std.debug.assert
         const delta = opt.number - self.last_option;
 
         const odelta = DeltaEncoding.encode(delta);
         const olen = DeltaEncoding.encode(@intCast(u32, opt.value.len));
 
-        // Write first byte of CoAP option format.
-        try self.buffer.byte(@as(u8, odelta.id()) << 4 | olen.id());
+        const reqcap = 1 + odelta.size() + olen.size() + opt.value.len;
+        if (self.buffer.capacity() < reqcap)
+            return error.OutOfBounds;
 
-        // Write extended bits of option delta/length (if any).
-        try odelta.writeExtend(&self.buffer);
-        try olen.writeExtend(&self.buffer);
+        // See https://datatracker.ietf.org/doc/html/rfc7252#section-3.1
+        self.buffer.byte(@as(u8, odelta.id()) << 4 | olen.id());
+        odelta.writeExtend(&self.buffer);
+        olen.writeExtend(&self.buffer);
+        self.buffer.bytes(opt.value);
 
-        try self.buffer.bytes(opt.value);
         self.last_option = opt.number;
     }
 
@@ -169,6 +182,18 @@ test "test header serialization with token" {
     try expect(std.mem.eql(u8, serialized, exp));
 }
 
+test "test header serialization with insufficient buffer space" {
+    const exp: []const u8 = &[_]u8{ 0, 0, 0 };
+    var buf = [_]u8{0} ** exp.len;
+
+    // Given buffer is large enough to contain header, but one byte too
+    // small too contain the given token, thus an error should be raised.
+    try std.testing.expectError(error.OutOfBounds, Response.init(&buf, Mtype.acknowledgement, codes.PUT, &[_]u8{23}, 5));
+
+    // Ensure that Response.init has no side effects.
+    try expect(std.mem.eql(u8, &buf, exp));
+}
+
 test "test option serialization" {
     const exp: []const u8 = &[_]u8{ 0x40, 0x01, 0x09, 0x26, 0x21, 0xff, 0xd2, 0x08, 0x0d, 0x25, 0xe0, 0xfe, 0xdb };
 
@@ -186,6 +211,10 @@ test "test option serialization" {
     // Two byte extension
     const opt2 = options.Option{ .number = 65535, .value = &[_]u8{} };
     try resp.addOption(&opt2);
+
+    // Two byte extension (not enough space in buffer)
+    const opt_err = options.Option{ .number = 65535, .value = &[_]u8{} };
+    try std.testing.expectError(error.OutOfBounds, resp.addOption(&opt_err));
 
     const serialized = resp.marshal();
     try expect(std.mem.eql(u8, serialized, exp));
