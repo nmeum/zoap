@@ -297,7 +297,7 @@ pub const Request = struct {
     header: Header,
     slice: buffer.ReadBuffer,
     token: []const u8,
-    payload: ?*const u8,
+    payload: ?([]const u8),
     last_option: ?opts.Option,
 
     pub fn init(buf: []const u8) !Request {
@@ -392,7 +392,7 @@ pub const Request = struct {
                 // For zero-length payload OPTION_END should not be set.
                 return error.InvalidPayload;
             } else {
-                self.payload = try self.slice.ptr();
+                self.payload = self.slice.remaining();
             }
             return null;
         }
@@ -448,7 +448,7 @@ pub const Request = struct {
     /// Skip all remain options in the CoAP packet and return a pointer
     /// to the package payload (if any). After this function has been
     /// called it is no longer possible to extract options from the packet.
-    pub fn extractPayload(self: *Request) !(?*const u8) {
+    pub fn extractPayload(self: *Request) !(?[]const u8) {
         while (true) {
             var opt = self.nextOption() catch |err| {
                 // The absence of the Payload Marker denotes a zero-length payload.
@@ -484,7 +484,7 @@ test "test payload parsing" {
     var req = try Request.init(buf);
 
     const payload = try req.extractPayload();
-    try testing.expect(payload.? == &buf[5]);
+    try testing.expect(std.mem.eql(u8, payload.?, "Hello"));
 }
 
 test "test nextOption without payload" {
@@ -533,7 +533,7 @@ test "test nextOption with payload" {
 
     // Extracting payload must work.
     const payload = try req.extractPayload();
-    try testing.expect(payload.? == &buf[10]);
+    try testing.expect(std.mem.eql(u8, payload.?, "foobar"));
 }
 
 test "test findOption without payload" {

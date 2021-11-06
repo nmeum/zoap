@@ -48,11 +48,8 @@ pub const ReadBuffer = struct {
         return self.slice.len;
     }
 
-    pub fn ptr(self: *ReadBuffer) !(*const u8) {
-        if (self.slice.len < 1)
-            return error.OutOfBounds;
-
-        return &self.slice[0];
+    pub fn remaining(self: *ReadBuffer) []const u8 {
+        return self.slice;
     }
 
     pub fn bytes(self: *ReadBuffer, numBytes: usize) !([]const u8) {
