@@ -509,7 +509,31 @@ test "test nextOption without payload" {
     try testing.expect(opt3.number == 65535);
     try testing.expect(std.mem.eql(u8, opt3.value, &[_]u8{}));
 
+    // No payload marker → expect error.
     try testing.expectError(error.EndOfStream, req.nextOption());
+}
+
+test "test nextOption with payload" {
+    const buf = @embedFile("../testvectors/payload-and-options.bin");
+    var req = try Request.init(buf);
+
+    const next_opt = try req.nextOption();
+    const opt = next_opt.?;
+
+    try testing.expect(opt.number == 0);
+    try testing.expect(std.mem.eql(u8, opt.value, "test"));
+
+    // Payload marker → expect null.
+    const last_opt = try req.nextOption();
+    try testing.expect(last_opt == null);
+
+    // Running nextOption again must return null again.
+    const last_opt_again = try req.nextOption();
+    try testing.expect(last_opt_again == null);
+
+    // Extracting payload must work.
+    const payload = try req.extractPayload();
+    try testing.expect(payload.? == &buf[10]);
 }
 
 test "test findOption without payload" {
@@ -531,6 +555,7 @@ test "test findOption without payload" {
     // Attempting to access the second option should result in usage error
     try testing.expectError(error.InvalidArgument, req.findOption(23));
 
-    // Skipping options and accessing payload should work.
+    // Skipping options and accessing payload should work
+    // but return an error since this packet has no payload.
     try testing.expectError(error.ZeroLengthPayload, req.extractPayload());
 }

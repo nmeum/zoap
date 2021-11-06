@@ -59,6 +59,21 @@ func withOptions() ([]byte, error) {
 	}.Marshal()
 }
 
+func payloadAndOptions() ([]byte, error) {
+	var opts coap.Options = []coap.Option{
+		coap.Option{0, []byte("test")},
+	}
+
+	return message.Message{
+		Code:      codes.DELETE,
+		Token:     []byte{},
+		Payload:   []byte("foobar"),
+		MessageID: 255,
+		Type:      message.NonConfirmable,
+		Options:   opts,
+	}.Marshal()
+}
+
 func main() {
 	log.SetFlags(log.Lshortfile)
 
@@ -70,6 +85,7 @@ func main() {
 		{ "basic-header", basicHeader },
 		{ "with-token", withToken },
 		{ "with-options", withOptions },
+		{ "payload-and-options", payloadAndOptions },
 	}
 
 	// Directory where source file is located.
