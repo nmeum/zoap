@@ -1,7 +1,7 @@
 const std = @import("std");
-const expect = std.testing.expect;
-const buffer = @import("buffer.zig");
+const testing = std.testing;
 
+const buffer = @import("buffer.zig");
 const codes = @import("code.zig");
 const options = @import("options.zig");
 
@@ -229,7 +229,7 @@ test "test header serialization" {
     var resp = try Response.init(&buf, Mtype.confirmable, codes.GET, &[_]u8{}, 2342);
 
     const serialized = resp.marshal();
-    try expect(std.mem.eql(u8, serialized, exp));
+    try testing.expect(std.mem.eql(u8, serialized, exp));
 }
 
 test "test header serialization with token" {
@@ -239,7 +239,7 @@ test "test header serialization with token" {
     var resp = try Response.init(&buf, Mtype.acknowledgement, codes.PUT, &[_]u8{ 23, 42 }, 5);
 
     const serialized = resp.marshal();
-    try expect(std.mem.eql(u8, serialized, exp));
+    try testing.expect(std.mem.eql(u8, serialized, exp));
 }
 
 test "test header serialization with insufficient buffer space" {
@@ -248,10 +248,10 @@ test "test header serialization with insufficient buffer space" {
 
     // Given buffer is large enough to contain header, but one byte too
     // small too contain the given token, thus an error should be raised.
-    try std.testing.expectError(error.BufTooSmall, Response.init(&buf, Mtype.acknowledgement, codes.PUT, &[_]u8{23}, 5));
+    try testing.expectError(error.BufTooSmall, Response.init(&buf, Mtype.acknowledgement, codes.PUT, &[_]u8{23}, 5));
 
     // Ensure that Response.init has no side effects.
-    try expect(std.mem.eql(u8, &buf, exp));
+    try testing.expect(std.mem.eql(u8, &buf, exp));
 }
 
 test "test payload serialization" {
@@ -264,7 +264,7 @@ test "test payload serialization" {
     try w.print("Hello", .{});
 
     const serialized = resp.marshal();
-    try expect(std.mem.eql(u8, serialized, exp));
+    try testing.expect(std.mem.eql(u8, serialized, exp));
 }
 
 test "test option serialization" {
@@ -287,10 +287,10 @@ test "test option serialization" {
 
     // Two byte extension (not enough space in buffer)
     const opt_err = options.Option{ .number = 65535, .value = &[_]u8{} };
-    try std.testing.expectError(error.BufTooSmall, resp.addOption(&opt_err));
+    try testing.expectError(error.BufTooSmall, resp.addOption(&opt_err));
 
     const serialized = resp.marshal();
-    try expect(std.mem.eql(u8, serialized, exp));
+    try testing.expect(std.mem.eql(u8, serialized, exp));
 }
 
 pub const Request = struct {
@@ -453,12 +453,12 @@ test "test header parser" {
     const req = try Request.init(buf);
     const hdr = req.header;
 
-    try expect(hdr.version == VERSION);
-    try expect(hdr.type == Mtype.confirmable);
-    try expect(hdr.token_len == 1);
-    try expect(req.token[0] == 23);
-    try expect(hdr.code.equal(codes.GET));
-    try expect(hdr.message_id == 2342);
+    try testing.expect(hdr.version == VERSION);
+    try testing.expect(hdr.type == Mtype.confirmable);
+    try testing.expect(hdr.token_len == 1);
+    try testing.expect(req.token[0] == 23);
+    try testing.expect(hdr.code.equal(codes.GET));
+    try testing.expect(hdr.message_id == 2342);
 }
 
 test "test payload parsing" {
@@ -466,7 +466,7 @@ test "test payload parsing" {
     var req = try Request.init(buf);
 
     try req.skipOptions();
-    try expect(req.payload.? == &buf[7]);
+    try testing.expect(req.payload.? == &buf[7]);
 }
 
 test "test option parser" {
@@ -477,10 +477,10 @@ test "test option parser" {
     const opt = next_opt.?;
     const val = opt.value;
 
-    try expect(opt.number == 23);
-    try expect(val.len == 2);
-    try expect(val[0] == 13);
-    try expect(val[1] == 37);
+    try testing.expect(opt.number == 23);
+    try testing.expect(val.len == 2);
+    try testing.expect(val[0] == 13);
+    try testing.expect(val[1] == 37);
 }
 
 test "test findOption" {
@@ -489,19 +489,19 @@ test "test findOption" {
 
     // First option
     const opt1 = try req.findOption(23);
-    try expect(opt1.number == 23);
+    try testing.expect(opt1.number == 23);
     const exp1: []const u8 = &[_]u8{ 1, 2, 3, 4 };
-    try expect(std.mem.eql(u8, exp1, opt1.value));
+    try testing.expect(std.mem.eql(u8, exp1, opt1.value));
 
     // Third option, skipping second
     const opt3 = try req.findOption(50);
-    try expect(opt3.number == 50);
+    try testing.expect(opt3.number == 50);
     const exp3: []const u8 = &[_]u8{1};
-    try expect(std.mem.eql(u8, exp3, opt3.value));
+    try testing.expect(std.mem.eql(u8, exp3, opt3.value));
 
     // Attempting to access the second option should result in usage error
-    try std.testing.expectError(error.InvalidArgument, req.findOption(23));
+    try testing.expectError(error.InvalidArgument, req.findOption(23));
 
     // Skipping options and accessing payload should work.
-    try std.testing.expectError(error.ZeroLengthPayload, req.skipOptions());
+    try testing.expectError(error.ZeroLengthPayload, req.skipOptions());
 }
