@@ -132,6 +132,8 @@ pub const Response = struct {
     pub fn init(buf: []u8, mtype: Mtype, code: codes.Code, token: []const u8, id: u16) !Response {
         if (buf.len < @sizeOf(Header) + token.len)
             return error.OutOfBounds;
+        if (token.len > MAX_TOKEN_LEN)
+            return error.InvalidTokenLength;
 
         var hdr = Header{
             .version = VERSION,
