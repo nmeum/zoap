@@ -17,12 +17,9 @@ pub const WriteBuffer = struct {
     }
 
     pub fn bytes(self: *WriteBuffer, buf: []const u8) void {
-        // mem.copy does not provide safety-checked undefined
-        // behaviour. Thus, it is added explicitly here via
-        // unreachable.
-        if (self.capacity() < buf.len)
-            unreachable; // could also use std.debug.assert
-
+        // mem.copy does provide us with safety-checked
+        // undefined behaviour. Thus we don't need to check
+        // the capacity explicitly here.
         mem.copy(u8, self.slice[self.pos..], buf);
         self.pos += buf.len;
     }
