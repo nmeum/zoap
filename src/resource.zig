@@ -1,7 +1,7 @@
 const std = @import("std");
 const pkt = @import("packet.zig");
 const opt = @import("options.zig");
-const codes = @import("code.zig");
+const codes = @import("codes.zig");
 
 // TODO: Pass response writer.
 pub const ResourceHandler = fn (req: *pkt.Request) void;
