@@ -165,7 +165,14 @@ pub const Response = struct {
         return init(buf, mtype, code, req.token, hdr.message_id);
     }
 
+    /// Add an option to the CoAP response. Options must be added in the
+    /// in order of their Option Numbers. After data has been written to
+    /// the payload, no additional options can be added. Both invariants
+    /// are enforced using assertions in Debug and ReleaseSafe modes.
     pub fn addOption(self: *Response, opt: *const options.Option) !void {
+        // This function cannot be called after payload has been written.
+        std.debug.assert(self.zero_payload);
+
         std.debug.assert(self.last_option <= opt.number);
         const delta = opt.number - self.last_option;
 
