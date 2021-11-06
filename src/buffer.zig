@@ -44,31 +44,8 @@ pub const WriteBuffer = struct {
 pub const ReadBuffer = struct {
     slice: []const u8,
 
-    pub fn byte(self: *ReadBuffer) !u8 {
-        if (self.slice.len < @sizeOf(u8))
-            return error.OutOfBounds;
-
-        const result = self.slice[0];
-        self.slice = self.slice[@sizeOf(u8)..];
-        return result;
-    }
-
-    pub fn half(self: *ReadBuffer) !u16 {
-        if (self.slice.len < @sizeOf(u16))
-            return error.OutOfBounds;
-
-        const result = self.slice[0..@sizeOf(u16)].*;
-        self.slice = self.slice[@sizeOf(u16)..];
-        return @bitCast(u16, result);
-    }
-
-    pub fn word(self: *ReadBuffer) !u32 {
-        if (self.slice.len < @sizeOf(u32))
-            return error.OutOfBounds;
-
-        const result = self.slice[0..@sizeOf(u32)].*;
-        self.slice = self.slice[@sizeOf(u32)..];
-        return @bitCast(u32, result);
+    pub fn length(self: *ReadBuffer) usize {
+        return self.slice.len;
     }
 
     pub fn ptr(self: *ReadBuffer) !(*const u8) {
@@ -87,7 +64,26 @@ pub const ReadBuffer = struct {
         return result;
     }
 
-    pub fn length(self: *ReadBuffer) usize {
-        return self.slice.len;
+    fn read(self: *ReadBuffer, comptime T: type, dest: anytype) !void {
+        const slice = try self.bytes(@sizeOf(T));
+        dest.* = @bitCast(T, slice[0..@sizeOf(T)].*);
+    }
+
+    pub fn byte(self: *ReadBuffer) !u8 {
+        var r: u8 = undefined;
+        try self.read(u8, &r);
+        return r;
+    }
+
+    pub fn half(self: *ReadBuffer) !u16 {
+        var r: u16 = undefined;
+        try self.read(u16, &r);
+        return r;
+    }
+
+    pub fn word(self: *ReadBuffer) !u32 {
+        var r: u32 = undefined;
+        try self.read(u32, &r);
+        return r;
     }
 };
