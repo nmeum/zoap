@@ -223,7 +223,7 @@ pub const Response = struct {
 };
 
 test "test header serialization" {
-    const exp: []const u8 = &[_]u8{ 0x40, 0x01, 0x09, 0x26 };
+    const exp = @embedFile("../testvectors/basic-header.bin");
 
     var buf = [_]u8{0} ** exp.len;
     var resp = try Response.init(&buf, Msg.con, codes.GET, &[_]u8{}, 2342);
@@ -233,7 +233,7 @@ test "test header serialization" {
 }
 
 test "test header serialization with token" {
-    const exp: []const u8 = &[_]u8{ 0x62, 0x03, 0x00, 0x05, 0x17, 0x2a };
+    const exp = @embedFile("../testvectors/with-token.bin");
 
     var buf = [_]u8{0} ** exp.len;
     var resp = try Response.init(&buf, Msg.ack, codes.PUT, &[_]u8{ 23, 42 }, 5);
@@ -255,7 +255,7 @@ test "test header serialization with insufficient buffer space" {
 }
 
 test "test payload serialization" {
-    const exp: []const u8 = &[_]u8{ 0x70, 0x04, 0x00, 0x01, 0xff, 0x48, 0x65, 0x6c, 0x6c, 0x6f };
+    const exp = @embedFile("../testvectors/with-payload.bin");
 
     var buf = [_]u8{0} ** exp.len;
     var resp = try Response.init(&buf, Msg.rst, codes.DELETE, &[_]u8{}, 1);
@@ -268,7 +268,7 @@ test "test payload serialization" {
 }
 
 test "test option serialization" {
-    const exp: []const u8 = &[_]u8{ 0x40, 0x01, 0x09, 0x26, 0x21, 0xff, 0xd2, 0x08, 0x0d, 0x25, 0xe0, 0xfe, 0xdb };
+    const exp = @embedFile("../testvectors/with-options.bin");
 
     var buf = [_]u8{0} ** exp.len;
     var resp = try Response.init(&buf, Msg.con, codes.GET, &[_]u8{}, 2342);
@@ -374,8 +374,11 @@ pub const Request = struct {
         }
     }
 
-    /// Returns the next option or null if all options have already been
-    /// parsed. Options are returned in the order of their Option Numbers.
+    /// Returns the next option or null if the packet contains a payload
+    /// and the option end has been reached. If the packet does not
+    /// contain a payload an error is returned.
+    ///
+    /// Options are returned in the order of their Option Numbers.
     fn nextOption(self: *Request) !?opts.Option {
         if (self.last_option == null)
             return null;
@@ -463,54 +466,66 @@ pub const Request = struct {
 };
 
 test "test header parser" {
-    const buf: []const u8 = &[_]u8{ 0x41, 0x01, 0x09, 0x26, 0x17 };
+    const buf = @embedFile("../testvectors/with-token.bin");
     const req = try Request.init(buf);
     const hdr = req.header;
 
     try testing.expect(hdr.version == VERSION);
-    try testing.expect(hdr.type == Msg.con);
-    try testing.expect(hdr.token_len == 1);
+    try testing.expect(hdr.type == Msg.ack);
+    try testing.expect(hdr.token_len == 2);
     try testing.expect(req.token[0] == 23);
-    try testing.expect(hdr.code.equal(codes.GET));
-    try testing.expect(hdr.message_id == 2342);
+    try testing.expect(req.token[1] == 42);
+    try testing.expect(hdr.code.equal(codes.PUT));
+    try testing.expect(hdr.message_id == 5);
 }
 
 test "test payload parsing" {
-    const buf: []const u8 = &[_]u8{ 0x62, 0x03, 0x04, 0xd2, 0xdd, 0x64, 0xff, 0x17, 0x2a, 0x0d, 0x25 };
+    const buf = @embedFile("../testvectors/with-payload.bin");
     var req = try Request.init(buf);
 
     const payload = try req.extractPayload();
-    try testing.expect(payload.? == &buf[7]);
+    try testing.expect(payload.? == &buf[5]);
 }
 
-test "test option parser" {
-    const buf: []const u8 = &[_]u8{ 0x41, 0x01, 0x09, 0x26, 0x17, 0xd2, 0x0a, 0x0d, 0x25 };
+test "test nextOption without payload" {
+    const buf = @embedFile("../testvectors/with-options.bin");
     var req = try Request.init(buf);
 
-    const next_opt = try req.nextOption();
-    const opt = next_opt.?;
-    const val = opt.value;
+    const opt1_opt = try req.nextOption();
+    const opt1 = opt1_opt.?;
 
-    try testing.expect(opt.number == 23);
-    try testing.expect(val.len == 2);
-    try testing.expect(val[0] == 13);
-    try testing.expect(val[1] == 37);
+    try testing.expect(opt1.number == 2);
+    try testing.expect(std.mem.eql(u8, opt1.value, &[_]u8{0xff}));
+
+    const opt2_opt = try req.nextOption();
+    const opt2 = opt2_opt.?;
+
+    try testing.expect(opt2.number == 23);
+    try testing.expect(std.mem.eql(u8, opt2.value, &[_]u8{ 13, 37 }));
+
+    const opt3_opt = try req.nextOption();
+    const opt3 = opt3_opt.?;
+
+    try testing.expect(opt3.number == 65535);
+    try testing.expect(std.mem.eql(u8, opt3.value, &[_]u8{}));
+
+    try testing.expectError(error.EndOfStream, req.nextOption());
 }
 
-test "test findOption" {
-    const buf: []const u8 = &[_]u8{ 0x51, 0x01, 0x30, 0x39, 0x05, 0xd4, 0x0a, 0x01, 0x02, 0x03, 0x04, 0xd1, 0x06, 0x17, 0x81, 0x01 };
+test "test findOption without payload" {
+    const buf = @embedFile("../testvectors/with-options.bin");
     var req = try Request.init(buf);
 
     // First option
-    const opt1 = try req.findOption(23);
-    try testing.expect(opt1.number == 23);
-    const exp1: []const u8 = &[_]u8{ 1, 2, 3, 4 };
+    const opt1 = try req.findOption(2);
+    try testing.expect(opt1.number == 2);
+    const exp1: []const u8 = &[_]u8{0xff};
     try testing.expect(std.mem.eql(u8, exp1, opt1.value));
 
     // Third option, skipping second
-    const opt3 = try req.findOption(50);
-    try testing.expect(opt3.number == 50);
-    const exp3: []const u8 = &[_]u8{1};
+    const opt3 = try req.findOption(65535);
+    try testing.expect(opt3.number == 65535);
+    const exp3: []const u8 = &[_]u8{};
     try testing.expect(std.mem.eql(u8, exp3, opt3.value));
 
     // Attempting to access the second option should result in usage error

@@ -18,6 +18,28 @@ See [How do I use packages?](https://github.com/ziglang/zig/wiki/FAQ#how-do-i-us
 
 See [zig-riscv-embedded][zig-riscv github] for a usage example.
 
+## Test vectors
+
+For parsing code, test vectors are generated using the existing
+[go-coap][go-coap github] implementation written in [Go][go website].
+Test vectors are generated using `./testvectors/generate.go` and
+available as `./testvectors/*.bin` files. These files are tracked in the
+Git repositories and thus Go is not necessarily needed to run existing
+tests.
+
+Each Zig test case embeds this file via [`@embedFile`][zig embedFile].
+All existing Zig parser test cases can be run using:
+
+	$ zig test src/packet.zig
+
+New test cases can be added by modifying `./testvectors/generate.go` and
+`./src/packet.zig`. Afterwards, the test case file needs to be generated
+using:
+
+	$ cd ./testvectors && go build -trimpath && ./testvectors
+
+New test vectors need to be committed to the Git repository.
+
 ## License
 
 This program is free software: you can redistribute it and/or modify it
@@ -36,3 +58,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 [coap rfc]: https://datatracker.ietf.org/doc/rfc7252/
 [zig web]: https://ziglang.org/
 [zig-riscv github]: https://github.com/nmeum/zig-riscv-embedded
+[go-coap github]: https://github.com/plgd-dev/go-coap
+[go website]: https://golang.org
+[zig embedFile]: https://ziglang.org/documentation/0.8.1/#embedFile
