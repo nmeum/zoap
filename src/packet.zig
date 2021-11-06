@@ -149,10 +149,10 @@ pub const Response = struct {
 };
 
 test "test header serialization" {
-    const exp: []const u8 = &[_]u8{ 0x41, 0x01, 0x09, 0x26 };
+    const exp: []const u8 = &[_]u8{ 0x40, 0x01, 0x09, 0x26 };
 
     var buf = [_]u8{0} ** exp.len;
-    var resp = try Response.init(&buf, Mtype.confirmable, codes.GET, &[_]u8{23}, 2342);
+    var resp = try Response.init(&buf, Mtype.confirmable, codes.GET, &[_]u8{}, 2342);
 
     const serialized = resp.marshal();
     try expect(std.mem.eql(u8, serialized, exp));
