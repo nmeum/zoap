@@ -22,16 +22,16 @@ pub const Dispatcher = struct {
     resources: []const Resource,
     rbuf: [REPLY_BUFSIZ]u8 = undefined,
 
-    pub fn reply(self: *Dispatcher, req: *const pkt.Request, mtype: pkt.Mtype, code: codes.Code) !pkt.Response {
-        return pkt.Response.reply(&self.rbuf, req, mtype, code);
+    pub fn reply(self: *Dispatcher, req: *const pkt.Request, mt: pkt.Msg, code: codes.Code) !pkt.Response {
+        return pkt.Response.reply(&self.rbuf, req, mt, code);
     }
 
     pub fn dispatch(self: *Dispatcher, req: *pkt.Request) !pkt.Response {
         const hdr = req.header;
-        if (hdr.type == pkt.Mtype.confirmable) {
+        if (hdr.type == pkt.Msg.con) {
             // We are not able to process confirmable message presently
             // thus *always* answer those with a reset with NOT_IMPL.
-            return self.reply(req, pkt.Mtype.reset, codes.NOT_IMPL);
+            return self.reply(req, pkt.Msg.rst, codes.NOT_IMPL);
         }
 
         const path_opt = try req.findOption(opt.URIPath);
@@ -42,9 +42,9 @@ pub const Dispatcher = struct {
                 continue;
 
             res.handler(req);
-            return self.reply(req, pkt.Mtype.non_confirmable, codes.CREATED);
+            return self.reply(req, pkt.Msg.non, codes.CREATED);
         }
 
-        return self.reply(req, pkt.Mtype.non_confirmable, codes.NOT_FOUND);
+        return self.reply(req, pkt.Msg.non, codes.NOT_FOUND);
     }
 };

@@ -42,16 +42,16 @@ const OPTION_END = 0xff;
 //  Confirmable (0), Non-confirmable (1), Acknowledgement (2), or Reset
 //  (3).
 //
-pub const Mtype = enum(u2) {
-    confirmable = 0,
-    non_confirmable = 1,
-    acknowledgement = 2,
-    reset = 3,
+pub const Msg = enum(u2) {
+    con = 0, // Confirmable
+    non = 1, // Non-confirmable
+    ack = 2, // Acknowledgement
+    rst = 3, // Reset
 };
 
 pub const Header = packed struct {
     token_len: u4,
-    type: Mtype,
+    type: Msg,
     version: u2,
     code: codes.Code,
     message_id: u16,
@@ -131,7 +131,7 @@ pub const Response = struct {
     const WriteError = error{BufTooSmall};
     const PayloadWriter = std.io.Writer(*Response, WriteError, write);
 
-    pub fn init(buf: []u8, mtype: Mtype, code: codes.Code, token: []const u8, id: u16) !Response {
+    pub fn init(buf: []u8, mt: Msg, code: codes.Code, token: []const u8, id: u16) !Response {
         if (buf.len < @sizeOf(Header) + token.len)
             return error.BufTooSmall;
         if (token.len > MAX_TOKEN_LEN)
@@ -139,7 +139,7 @@ pub const Response = struct {
 
         var hdr = Header{
             .version = VERSION,
-            .type = mtype,
+            .type = mt,
             .token_len = @intCast(u4, token.len),
             .code = code,
             .message_id = id,
@@ -160,9 +160,9 @@ pub const Response = struct {
         return r;
     }
 
-    pub fn reply(buf: []u8, req: *const Request, mtype: Mtype, code: codes.Code) !Response {
+    pub fn reply(buf: []u8, req: *const Request, mt: Msg, code: codes.Code) !Response {
         const hdr = req.header;
-        return init(buf, mtype, code, req.token, hdr.message_id);
+        return init(buf, mt, code, req.token, hdr.message_id);
     }
 
     /// Add an option to the CoAP response. Options must be added in the
@@ -226,7 +226,7 @@ test "test header serialization" {
     const exp: []const u8 = &[_]u8{ 0x40, 0x01, 0x09, 0x26 };
 
     var buf = [_]u8{0} ** exp.len;
-    var resp = try Response.init(&buf, Mtype.confirmable, codes.GET, &[_]u8{}, 2342);
+    var resp = try Response.init(&buf, Msg.con, codes.GET, &[_]u8{}, 2342);
 
     const serialized = resp.marshal();
     try testing.expect(std.mem.eql(u8, serialized, exp));
@@ -236,7 +236,7 @@ test "test header serialization with token" {
     const exp: []const u8 = &[_]u8{ 0x62, 0x03, 0x00, 0x05, 0x17, 0x2a };
 
     var buf = [_]u8{0} ** exp.len;
-    var resp = try Response.init(&buf, Mtype.acknowledgement, codes.PUT, &[_]u8{ 23, 42 }, 5);
+    var resp = try Response.init(&buf, Msg.ack, codes.PUT, &[_]u8{ 23, 42 }, 5);
 
     const serialized = resp.marshal();
     try testing.expect(std.mem.eql(u8, serialized, exp));
@@ -248,7 +248,7 @@ test "test header serialization with insufficient buffer space" {
 
     // Given buffer is large enough to contain header, but one byte too
     // small too contain the given token, thus an error should be raised.
-    try testing.expectError(error.BufTooSmall, Response.init(&buf, Mtype.acknowledgement, codes.PUT, &[_]u8{23}, 5));
+    try testing.expectError(error.BufTooSmall, Response.init(&buf, Msg.ack, codes.PUT, &[_]u8{23}, 5));
 
     // Ensure that Response.init has no side effects.
     try testing.expect(std.mem.eql(u8, &buf, exp));
@@ -258,7 +258,7 @@ test "test payload serialization" {
     const exp: []const u8 = &[_]u8{ 0x70, 0x04, 0x00, 0x01, 0xff, 0x48, 0x65, 0x6c, 0x6c, 0x6f };
 
     var buf = [_]u8{0} ** exp.len;
-    var resp = try Response.init(&buf, Mtype.reset, codes.DELETE, &[_]u8{}, 1);
+    var resp = try Response.init(&buf, Msg.rst, codes.DELETE, &[_]u8{}, 1);
 
     var w = resp.payloadWriter();
     try w.print("Hello", .{});
@@ -271,7 +271,7 @@ test "test option serialization" {
     const exp: []const u8 = &[_]u8{ 0x40, 0x01, 0x09, 0x26, 0x21, 0xff, 0xd2, 0x08, 0x0d, 0x25, 0xe0, 0xfe, 0xdb };
 
     var buf = [_]u8{0} ** exp.len;
-    var resp = try Response.init(&buf, Mtype.confirmable, codes.GET, &[_]u8{}, 2342);
+    var resp = try Response.init(&buf, Msg.con, codes.GET, &[_]u8{}, 2342);
 
     // Zero byte extension
     const opt0 = options.Option{ .number = 2, .value = &[_]u8{0xff} };
@@ -468,7 +468,7 @@ test "test header parser" {
     const hdr = req.header;
 
     try testing.expect(hdr.version == VERSION);
-    try testing.expect(hdr.type == Mtype.confirmable);
+    try testing.expect(hdr.type == Msg.con);
     try testing.expect(hdr.token_len == 1);
     try testing.expect(req.token[0] == 23);
     try testing.expect(hdr.code.equal(codes.GET));
