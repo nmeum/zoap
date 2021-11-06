@@ -27,12 +27,10 @@ For the former method, the package source tree needs to be explicitly
 added to `build.rs`. Assuming, the submodule was added as `./zoap` in
 the directory root the following code should be sufficient:
 
-```Zig
-exe.addPackage(std.build.Pkg{
-    .name = "zoap",
-    .path = "./zoap/src/zoap.zig",
-});
-```
+	exe.addPackage(std.build.Pkg{
+	    .name = "zoap",
+	    .path = "./zoap/src/zoap.zig",
+	});
 
 Afterwards, simply import zoap using `const zoap = @import("zoap");`.
 
