@@ -108,11 +108,12 @@ pub const Response = struct {
             .buffer = .{ .slice = buf },
         };
 
-        // Convert message ID to network byte order.
         hdr.message_id = std.mem.nativeToBig(u16, hdr.message_id);
-
         const serialized = @bitCast(u32, hdr);
+
+        // TODO: Reset buffer on error or check space in advance.
         try r.buffer.word(serialized);
+        try r.buffer.bytes(token);
 
         return r;
     }
@@ -153,6 +154,16 @@ test "test header serialization" {
 
     var buf = [_]u8{0} ** exp.len;
     var resp = try Response.init(&buf, Mtype.confirmable, codes.GET, &[_]u8{}, 2342);
+
+    const serialized = resp.marshal();
+    try expect(std.mem.eql(u8, serialized, exp));
+}
+
+test "test header serialization with token" {
+    const exp: []const u8 = &[_]u8{ 0x62, 0x03, 0x00, 0x05, 0x17, 0x2a };
+
+    var buf = [_]u8{0} ** exp.len;
+    var resp = try Response.init(&buf, Mtype.acknowledgement, codes.PUT, &[_]u8{ 23, 42 }, 5);
 
     const serialized = resp.marshal();
     try expect(std.mem.eql(u8, serialized, exp));
