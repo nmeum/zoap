@@ -1,6 +1,6 @@
 # zoap
 
-A WiP [CoAP][rfc 7252] implementation for bare-metal [constrained devices][rfc 7228].
+A WiP [CoAP][rfc 7252] implementation for bare-metal [constrained devices][rfc 7228] in [Zig][zig web].
 
 ## Status
 
@@ -36,7 +36,59 @@ Afterwards, simply import zoap using `const zoap = @import("zoap");`.
 
 ## Usage
 
-See [zig-riscv-embedded][zig-riscv github] for a usage example.
+As noted above, this library targets freestanding constrained devices.
+For this reason, all memory is statically allocated. To implement a CoAP
+server with zoap, the central data structure is the Dispatcher. This
+Dispatcher takes a list of Resources and forwards incoming requests to
+them if the URI in the request matches one of the available resources.
+Both, the dispatcher and the resources need to be statically allocated,
+e.g. as global variables:
+
+	const resources = &[_]zoap.Resource{
+	    .{ .path = "hello", .handler = helloHandler },
+	    .{ .path = "about", .handler = aboutHandler },
+	};
+	var dispatcher = zoap.Dispatcher{
+	    .resources = resources,
+	};
+
+The code above allocates a dispatcher with two resources: `/hello` and
+`/about`. An incoming CoAP request for either of those resources invokes
+the associated handler function. The `helloHandler` implementation may
+looks as follows:
+
+	pub fn helloHandler(resp: *zoap.Response, req: *zoap.Request) codes.Code {
+	    if (!req.header.code.equal(codes.GET))
+	        return codes.BAD_METHOD;
+	
+	    const w = resp.payloadWriter();
+	    w.writeAll("Hello, World!") catch {
+	        return codes.INTERNAL_ERR;
+	    };
+	
+	    return codes.CONTENT;
+	}
+
+The function takes two parameters: The resulting CoAP response and the
+incoming CoAP request. The handler returns the CoAP response code for
+the incoming request. The implementation above first checks the request
+method, if it doesn't match the expected method a response with a
+Method Not Allowed status code is returned. Otherwise, the
+`helloHandler` writes `Hello, World!` to the response body and, unless an
+error occurs, it responses with a successful content response code.
+
+In order to invoke these handlers, incoming CoAP requests need to be
+forwarded to the Dispatcher via the `Dispatcher.dispatch` method which
+takes an incoming CoAP request as a parameter and forwards it to the
+matching resource (if any). The method returns the appropriate CoAP
+response. Since this library attempts to be OS-independent, the code for
+retrieving incoming requests and sending responses to these requests
+depends on your environment. For example, CoAP request may be read from
+a UDP socket in a POSIX environment.
+
+For or a more detailed and complete usage example refer to
+[zig-riscv-embedded][zig-riscv github] which reads incoming requests
+from a [SLIP][rfc 1055] serial interface.
 
 ## Test vectors
 
@@ -77,6 +129,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 [rfc 7252]: https://datatracker.ietf.org/doc/rfc7252/
 [rfc 7228]: https://datatracker.ietf.org/doc/rfc7228/
+[rfc 1055]: https://datatracker.ietf.org/doc/rfc1055/
 [zig web]: https://ziglang.org/
 [zig-riscv github]: https://github.com/nmeum/zig-riscv-embedded
 [go-coap github]: https://github.com/plgd-dev/go-coap
