@@ -374,7 +374,8 @@ pub const Request = struct {
         }
     }
 
-    // TODO: asserts for function call order (e.g. no nextOption after skipOptions)
+    /// Returns the next option or null if all options have already been
+    /// parsed. Options are returned in the order of their Option Numbers.
     fn nextOption(self: *Request) !?options.Option {
         if (self.last_option == null)
             return null;
@@ -410,6 +411,13 @@ pub const Request = struct {
         return ret;
     }
 
+    /// Find an option with the given Option Number in the CoAP packet.
+    /// It is an error if an option with the given Option Number does
+    /// not exist. After this function has been called (even if an error
+    /// was returned) it is no longer possible to retrieve options with
+    /// a smaller Option Number then the given one. Similarly, when
+    /// attempting to find multiple options, this function must be
+    /// called in order of their Option Numbers.
     pub fn findOption(self: *Request, optnum: u32) !options.Option {
         if (optnum == 0)
             return error.InvalidArgument;
@@ -418,7 +426,7 @@ pub const Request = struct {
 
         const n = self.last_option.?.number;
         if (n > 0 and n >= optnum)
-            return error.InvalidArgument;
+            return error.InvalidArgument; // XXX: Use assert instead?
 
         while (true) {
             const next = try self.nextOption();
@@ -434,7 +442,10 @@ pub const Request = struct {
         }
     }
 
-    pub fn skipOptions(self: *Request) !void {
+    /// Skip all remain options in the CoAP packet and return a pointer
+    /// to the package payload (if any). After this function has been
+    /// called it is no longer possible to extract options from the packet.
+    pub fn extractPayload(self: *Request) !(?*const u8) {
         while (true) {
             var opt = self.nextOption() catch |err| {
                 // The absence of the Payload Marker denotes a zero-length payload.
@@ -445,6 +456,9 @@ pub const Request = struct {
             if (opt == null)
                 break;
         }
+
+        std.debug.assert(self.last_option == null);
+        return self.payload;
     }
 };
 
@@ -465,8 +479,8 @@ test "test payload parsing" {
     const buf: []const u8 = &[_]u8{ 0x62, 0x03, 0x04, 0xd2, 0xdd, 0x64, 0xff, 0x17, 0x2a, 0x0d, 0x25 };
     var req = try Request.init(buf);
 
-    try req.skipOptions();
-    try testing.expect(req.payload.? == &buf[7]);
+    const payload = try req.extractPayload();
+    try testing.expect(payload.? == &buf[7]);
 }
 
 test "test option parser" {
@@ -503,5 +517,5 @@ test "test findOption" {
     try testing.expectError(error.InvalidArgument, req.findOption(23));
 
     // Skipping options and accessing payload should work.
-    try testing.expectError(error.ZeroLengthPayload, req.skipOptions());
+    try testing.expectError(error.ZeroLengthPayload, req.extractPayload());
 }
