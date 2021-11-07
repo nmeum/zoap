@@ -131,7 +131,7 @@ pub const Response = struct {
 
     pub fn init(buf: []u8, mtype: Mtype, code: codes.Code, token: []const u8, id: u16) !Response {
         if (buf.len < @sizeOf(Header) + token.len)
-            return error.OutOfBounds;
+            return error.BufTooSmall;
         if (token.len > MAX_TOKEN_LEN)
             return error.InvalidTokenLength;
 
@@ -172,7 +172,7 @@ pub const Response = struct {
 
         const reqcap = 1 + odelta.size() + olen.size() + opt.value.len;
         if (self.buffer.capacity() < reqcap)
-            return error.OutOfBounds;
+            return error.BufTooSmall;
 
         // See https://datatracker.ietf.org/doc/html/rfc7252#section-3.1
         self.buffer.byte(@as(u8, odelta.id()) << 4 | olen.id());
@@ -214,7 +214,7 @@ test "test header serialization with insufficient buffer space" {
 
     // Given buffer is large enough to contain header, but one byte too
     // small too contain the given token, thus an error should be raised.
-    try std.testing.expectError(error.OutOfBounds, Response.init(&buf, Mtype.acknowledgement, codes.PUT, &[_]u8{23}, 5));
+    try std.testing.expectError(error.BufTooSmall, Response.init(&buf, Mtype.acknowledgement, codes.PUT, &[_]u8{23}, 5));
 
     // Ensure that Response.init has no side effects.
     try expect(std.mem.eql(u8, &buf, exp));
@@ -240,7 +240,7 @@ test "test option serialization" {
 
     // Two byte extension (not enough space in buffer)
     const opt_err = options.Option{ .number = 65535, .value = &[_]u8{} };
-    try std.testing.expectError(error.OutOfBounds, resp.addOption(&opt_err));
+    try std.testing.expectError(error.BufTooSmall, resp.addOption(&opt_err));
 
     const serialized = resp.marshal();
     try expect(std.mem.eql(u8, serialized, exp));
