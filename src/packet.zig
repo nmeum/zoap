@@ -38,71 +38,75 @@ pub const Header = packed struct {
     message_id: u16,
 };
 
+/// Implements delta encoding for the CoAP option format.
+const DeltaEncoding = union(enum) {
+    noExt: u4,
+    extByte: u8,
+    extHalf: u16,
+
+    fn encode(val: u32) DeltaEncoding {
+        switch (val) {
+            0...12 => {
+                // From RFC 7252:
+                //
+                //   A value between 0 and 12 indicates the Option Delta.
+                return DeltaEncoding{ .noExt = @intCast(u4, val) };
+            },
+            13...268 => { // 268 = 2^8 + 13 - 1
+                // From RFC 7252:
+                //
+                //   An 8-bit unsigned integer follows the initial byte and
+                //   indicates the Option Delta minus 13.
+                return DeltaEncoding{ .extByte = @intCast(u8, (val - 13)) };
+            },
+            269...65804 => { // 65804 = 2^16 + 269 - 1
+                // From RFC 7252:
+                //
+                //   A 16-bit unsigned integer in network byte order follows the
+                //   initial byte and indicates the Option Delta minus 269.
+                const v = std.mem.nativeToBig(u16, @intCast(u16, val - 269));
+                return DeltaEncoding{ .extHalf = v };
+            },
+            else => unreachable,
+        }
+    }
+
+    /// Identifier for nibbles in the first CoAP option byte.
+    fn id(self: DeltaEncoding) u4 {
+        switch (self) {
+            DeltaEncoding.noExt => |x| return x,
+            DeltaEncoding.extByte => return 13,
+            DeltaEncoding.extHalf => return 14,
+        }
+    }
+
+    /// Amount of additionall extension bytes (0-2 bytes)
+    /// required to store this value (not including the initial ID
+    /// byte in the option format).
+    fn size(self: DeltaEncoding) usize {
+        return switch (self) {
+            DeltaEncoding.noExt => 0,
+            DeltaEncoding.extByte => 1,
+            DeltaEncoding.extHalf => 2,
+        };
+    }
+
+    /// Write extension bytes (0-2 bytes) to the given WriteBuffer
+    /// with safety-checked undefined behaviour.
+    fn writeExtend(self: DeltaEncoding, wb: *buffer.WriteBuffer) void {
+        switch (self) {
+            DeltaEncoding.noExt => {},
+            DeltaEncoding.extByte => |x| wb.byte(x),
+            DeltaEncoding.extHalf => |x| wb.half(x),
+        }
+    }
+};
+
 pub const Response = struct {
     header: Header,
     token: []const u8,
     buffer: buffer.WriteBuffer,
     last_option: u32 = 0,
-
-    const DeltaEncoding = union(enum) {
-        noExt: u4,
-        extByte: u8,
-        extHalf: u16,
-
-        fn encode(val: u32) DeltaEncoding {
-            switch (val) {
-                0...12 => {
-                    // From RFC 7252:
-                    //
-                    //   A value between 0 and 12 indicates the Option Delta.
-                    return DeltaEncoding{ .noExt = @intCast(u4, val) };
-                },
-                13...268 => { // 268 = 2^8 + 13 - 1
-                    // From RFC 7252:
-                    //
-                    //   An 8-bit unsigned integer follows the initial byte and
-                    //   indicates the Option Delta minus 13.
-                    return DeltaEncoding{ .extByte = @intCast(u8, (val - 13)) };
-                },
-                269...65804 => { // 65804 = 2^16 + 269 - 1
-                    // From RFC 7252:
-                    //
-                    //   A 16-bit unsigned integer in network byte order follows the
-                    //   initial byte and indicates the Option Delta minus 269.
-                    const v = std.mem.nativeToBig(u16, @intCast(u16, val - 269));
-                    return DeltaEncoding{ .extHalf = v };
-                },
-                else => unreachable,
-            }
-        }
-
-        fn id(self: DeltaEncoding) u4 {
-            switch (self) {
-                DeltaEncoding.noExt => |x| return x,
-                DeltaEncoding.extByte => return 13,
-                DeltaEncoding.extHalf => return 14,
-            }
-        }
-
-        /// Amount of additionall extension bytes (0 - 2 bytes)
-        /// required to store this value (not including the initial ID
-        /// byte in the option format).
-        fn size(self: DeltaEncoding) usize {
-            return switch (self) {
-                DeltaEncoding.noExt => 0,
-                DeltaEncoding.extByte => 1,
-                DeltaEncoding.extHalf => 2,
-            };
-        }
-
-        fn writeExtend(self: DeltaEncoding, wb: *buffer.WriteBuffer) void {
-            switch (self) {
-                DeltaEncoding.noExt => {},
-                DeltaEncoding.extByte => |x| wb.byte(x),
-                DeltaEncoding.extHalf => |x| wb.half(x),
-            }
-        }
-    };
 
     pub fn init(buf: []u8, mtype: Mtype, code: codes.Code, token: []const u8, id: u16) !Response {
         if (buf.len < @sizeOf(Header) + token.len)
