@@ -13,7 +13,7 @@ footprint and uses statically allocated fixed-size buffers instead of
 performing dynamic memory allocation. Furthermore, it does not use any
 OS-specific code from the Zig standard library (e.g. Sockets).
 
-The code is known to compile with Zig `0.8.1`.
+The code is known to compile with Zig `0.9.1`.
 
 ## Installation
 
@@ -134,7 +134,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 [zig-riscv github]: https://github.com/nmeum/zig-riscv-embedded
 [go-coap github]: https://github.com/plgd-dev/go-coap
 [go website]: https://golang.org
-[zig embedFile]: https://ziglang.org/documentation/0.8.1/#embedFile
-[zig import]: https://ziglang.org/documentation/0.8.1/#import
+[zig embedFile]: https://ziglang.org/documentation/0.9.1/#embedFile
+[zig import]: https://ziglang.org/documentation/0.9.1/#import
 [git submodules]: https://git-scm.com/book/en/v2/Git-Tools-Submodules
 [gyro github]: https://github.com/mattnite/gyro
