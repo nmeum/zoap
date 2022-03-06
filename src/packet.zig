@@ -238,7 +238,7 @@ test "test header serialization" {
     try testing.expect(std.mem.eql(u8, serialized, exp));
 }
 
-test "test setCode after package creation" {
+test "test setCode after packet creation" {
     const exp = @embedFile("../testvectors/basic-header.bin");
 
     var buf = [_]u8{0} ** exp.len;
@@ -464,8 +464,8 @@ pub const Request = struct {
         }
     }
 
-    /// Skip all remain options in the CoAP packet and return a pointer
-    /// to the package payload (if any). After this function has been
+    /// Skip all remaining options in the CoAP packet and return a pointer
+    /// to the packet payload (if any). After this function has been
     /// called it is no longer possible to extract options from the packet.
     pub fn extractPayload(self: *Request) !(?[]const u8) {
         while (true) {
