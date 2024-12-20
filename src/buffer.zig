@@ -63,7 +63,7 @@ pub const ReadBuffer = struct {
 
     fn read(self: *ReadBuffer, comptime T: type, dest: anytype) !void {
         const slice = try self.bytes(@sizeOf(T));
-        dest.* = @bitCast(T, slice[0..@sizeOf(T)].*);
+        dest.* = @bitCast(slice[0..@sizeOf(T)].*);
     }
 
     pub fn byte(self: *ReadBuffer) !u8 {
