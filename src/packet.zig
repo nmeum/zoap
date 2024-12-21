@@ -69,21 +69,21 @@ const DeltaEncoding = union(enum) {
                 // From RFC 7252:
                 //
                 //   A value between 0 and 12 indicates the Option Delta.
-                return DeltaEncoding{ .noExt = @intCast(u4, val) };
+                return DeltaEncoding{ .noExt = @intCast(val) };
             },
             13...268 => { // 268 = 2^8 + 13 - 1
                 // From RFC 7252:
                 //
                 //   An 8-bit unsigned integer follows the initial byte and
                 //   indicates the Option Delta minus 13.
-                return DeltaEncoding{ .extByte = @intCast(u8, (val - 13)) };
+                return DeltaEncoding{ .extByte = @intCast(val - 13) };
             },
             269...65804 => { // 65804 = 2^16 + 269 - 1
                 // From RFC 7252:
                 //
                 //   A 16-bit unsigned integer in network byte order follows the
                 //   initial byte and indicates the Option Delta minus 269.
-                const v = std.mem.nativeToBig(u16, @intCast(u16, val - 269));
+                const v = std.mem.nativeToBig(u16, @intCast(val - 269));
                 return DeltaEncoding{ .extHalf = v };
             },
             else => unreachable,
@@ -140,7 +140,7 @@ pub const Response = struct {
         var hdr = Header{
             .version = VERSION,
             .type = mt,
-            .token_len = @intCast(u4, token.len),
+            .token_len = @intCast(token.len),
             .code = code,
             .message_id = id,
         };
@@ -152,7 +152,7 @@ pub const Response = struct {
         };
 
         hdr.message_id = std.mem.nativeToBig(u16, hdr.message_id);
-        const serialized = @bitCast(u32, hdr);
+        const serialized = @as(u32, @bitCast(hdr));
 
         r.buffer.word(serialized);
         r.buffer.bytes(token);
@@ -177,7 +177,7 @@ pub const Response = struct {
         const delta = opt.number - self.last_option;
 
         const odelta = DeltaEncoding.encode(delta);
-        const olen = DeltaEncoding.encode(@intCast(u32, opt.value.len));
+        const olen = DeltaEncoding.encode(@intCast(opt.value.len));
 
         const reqcap = 1 + odelta.size() + olen.size() + opt.value.len;
         if (self.buffer.capacity() < reqcap)
@@ -216,7 +216,7 @@ pub const Response = struct {
     /// Update CoAP response code after creating the packet.
     pub fn setCode(self: *Response, code: codes.Code) void {
         // Code is *always* the second byte in the buffer.
-        self.buffer.slice[1] = @bitCast(u8, code);
+        self.buffer.slice[1] = @bitCast(code);
     }
 
     pub fn payloadWriter(self: *Response) PayloadWriter {
@@ -326,7 +326,7 @@ pub const Request = struct {
 
         // Cast first four bytes to u32 and convert them to header struct
         const serialized: u32 = try slice.word();
-        var hdr = @bitCast(Header, serialized);
+        var hdr = @as(Header, @bitCast(serialized));
 
         // Convert message_id to a integer in host byteorder
         hdr.message_id = std.mem.bigToNative(u16, hdr.message_id);
@@ -416,11 +416,11 @@ pub const Request = struct {
             return null;
         }
 
-        const delta = try self.decodeValue(@intCast(u4, option >> 4));
-        const len = try self.decodeValue(@intCast(u4, option & 0xf));
+        const delta = try self.decodeValue(@intCast(option >> 4));
+        const len = try self.decodeValue(@intCast(option & 0xf));
 
-        var optnum = self.last_option.?.number + delta;
-        var optval = self.slice.bytes(len) catch {
+        const optnum = self.last_option.?.number + delta;
+        const optval = self.slice.bytes(len) catch {
             return error.FormatError;
         };
 
@@ -469,7 +469,7 @@ pub const Request = struct {
     /// called it is no longer possible to extract options from the packet.
     pub fn extractPayload(self: *Request) !(?[]const u8) {
         while (true) {
-            var opt = self.nextOption() catch |err| {
+            const opt = self.nextOption() catch |err| {
                 // The absence of the Payload Marker denotes a zero-length payload.
                 if (err == error.EndOfStream)
                     return error.ZeroLengthPayload;
