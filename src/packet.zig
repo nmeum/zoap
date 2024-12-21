@@ -152,7 +152,7 @@ pub const Response = struct {
         };
 
         hdr.message_id = std.mem.nativeToBig(u16, hdr.message_id);
-        const serialized = @as(Header, @bitCast(hdr));
+        const serialized = @as(u32, @bitCast(hdr));
 
         r.buffer.word(serialized);
         r.buffer.bytes(token);
