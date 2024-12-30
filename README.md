@@ -94,21 +94,21 @@ from a [SLIP][rfc 1055] serial interface.
 
 For parsing code, test vectors are created using the existing
 [go-coap][go-coap github] implementation written in [Go][go website].
-Test vectors are generated using `./testvectors/generate.go` and
-available as `./testvectors/*.bin` files. These files are tracked in the
-Git repositories and thus Go is not necessarily needed to run existing
-tests.
+Test vectors are generated using `./src/testvectors/generate.go` and
+available as `./src/testvectors/*.bin` files. These files are tracked
+in the Git repositories and thus Go is not necessarily needed to run
+existing tests.
 
 Each Zig test case embeds this file via [`@embedFile`][zig embedFile].
 All existing Zig parser test cases can be run using:
 
 	$ zig test src/packet.zig
 
-New test cases can be added by modifying `./testvectors/generate.go` and
-`./src/packet.zig`. Afterwards, the test case files need to be
-regenerated using:
+New test cases can be added by modifying `./src/testvectors/generate.go` and
+`./src/packet.zig`. Afterwards, the test case files need to be regenerated
+using:
 
-	$ cd ./testvectors && go build -trimpath && ./testvectors
+	$ cd ./src/testvectors && go build -trimpath && ./testvectors
 
 New test vectors must be committed to the Git repository.
 

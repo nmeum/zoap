@@ -20,7 +20,7 @@ pub const WriteBuffer = struct {
         // mem.copy does provide us with safety-checked
         // undefined behaviour. Thus we don't need to check
         // the capacity explicitly here.
-        mem.copy(u8, self.slice[self.pos..], buf);
+        @memcpy(self.slice[self.pos .. self.pos + buf.len], buf);
         self.pos += buf.len;
     }
 

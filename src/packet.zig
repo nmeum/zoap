@@ -229,7 +229,7 @@ pub const Response = struct {
 };
 
 test "test header serialization" {
-    const exp = @embedFile("../testvectors/basic-header.bin");
+    const exp = @embedFile("testvectors/basic-header.bin");
 
     var buf = [_]u8{0} ** exp.len;
     var resp = try Response.init(&buf, Msg.con, codes.GET, &[_]u8{}, 2342);
@@ -239,7 +239,7 @@ test "test header serialization" {
 }
 
 test "test setCode after packet creation" {
-    const exp = @embedFile("../testvectors/basic-header.bin");
+    const exp = @embedFile("testvectors/basic-header.bin");
 
     var buf = [_]u8{0} ** exp.len;
     var resp = try Response.init(&buf, Msg.con, codes.DELETE, &[_]u8{}, 2342);
@@ -252,7 +252,7 @@ test "test setCode after packet creation" {
 }
 
 test "test header serialization with token" {
-    const exp = @embedFile("../testvectors/with-token.bin");
+    const exp = @embedFile("testvectors/with-token.bin");
 
     var buf = [_]u8{0} ** exp.len;
     var resp = try Response.init(&buf, Msg.ack, codes.PUT, &[_]u8{ 23, 42 }, 5);
@@ -274,7 +274,7 @@ test "test header serialization with insufficient buffer space" {
 }
 
 test "test payload serialization" {
-    const exp = @embedFile("../testvectors/with-payload.bin");
+    const exp = @embedFile("testvectors/with-payload.bin");
 
     var buf = [_]u8{0} ** exp.len;
     var resp = try Response.init(&buf, Msg.rst, codes.DELETE, &[_]u8{}, 1);
@@ -287,7 +287,7 @@ test "test payload serialization" {
 }
 
 test "test option serialization" {
-    const exp = @embedFile("../testvectors/with-options.bin");
+    const exp = @embedFile("testvectors/with-options.bin");
 
     var buf = [_]u8{0} ** exp.len;
     var resp = try Response.init(&buf, Msg.con, codes.GET, &[_]u8{}, 2342);
@@ -485,7 +485,7 @@ pub const Request = struct {
 };
 
 test "test header parser" {
-    const buf = @embedFile("../testvectors/with-token.bin");
+    const buf = @embedFile("testvectors/with-token.bin");
     const req = try Request.init(buf);
     const hdr = req.header;
 
@@ -499,7 +499,7 @@ test "test header parser" {
 }
 
 test "test payload parsing" {
-    const buf = @embedFile("../testvectors/with-payload.bin");
+    const buf = @embedFile("testvectors/with-payload.bin");
     var req = try Request.init(buf);
 
     const payload = try req.extractPayload();
@@ -507,7 +507,7 @@ test "test payload parsing" {
 }
 
 test "test nextOption without payload" {
-    const buf = @embedFile("../testvectors/with-options.bin");
+    const buf = @embedFile("testvectors/with-options.bin");
     var req = try Request.init(buf);
 
     const opt1_opt = try req.nextOption();
@@ -533,7 +533,7 @@ test "test nextOption without payload" {
 }
 
 test "test nextOption with payload" {
-    const buf = @embedFile("../testvectors/payload-and-options.bin");
+    const buf = @embedFile("testvectors/payload-and-options.bin");
     var req = try Request.init(buf);
 
     const next_opt = try req.nextOption();
@@ -556,7 +556,7 @@ test "test nextOption with payload" {
 }
 
 test "test findOption without payload" {
-    const buf = @embedFile("../testvectors/with-options.bin");
+    const buf = @embedFile("testvectors/with-options.bin");
     var req = try Request.init(buf);
 
     // First option
