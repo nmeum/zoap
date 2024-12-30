@@ -15,25 +15,6 @@ OS-specific code from the Zig standard library (e.g. Sockets).
 
 The code is known to compile with Zig `0.9.1`.
 
-## Installation
-
-Zig packages are simply Zig source trees and are imported using
-[`@import`][zig import] just like code from the Zig standard library.
-Therefore, the zoap source tree must be added to the Zig codebase using
-it. This can, for example, be achieved using [git submodules][git submodules]
-or a third-party package manager like [gyro][gyro github].
-
-For the former method, the package source tree needs to be explicitly
-added to `build.rs`. Assuming, the submodule was added as `./zoap` in
-the directory root the following code should be sufficient:
-
-	exe.addPackage(std.build.Pkg{
-	    .name = "zoap",
-	    .path = "./zoap/src/zoap.zig",
-	});
-
-Afterwards, simply import zoap using `const zoap = @import("zoap");`.
-
 ## Usage
 
 As noted above, this library targets freestanding constrained devices.
