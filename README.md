@@ -13,7 +13,7 @@ footprint and uses statically allocated fixed-size buffers instead of
 performing dynamic memory allocation. Furthermore, it does not use any
 OS-specific code from the Zig standard library (e.g. Sockets).
 
-The code is known to compile with Zig `0.9.1`.
+The code is known to compile with Zig `0.13.0`.
 
 ## Usage
 
